@@ -583,11 +583,11 @@ st.markdown("""
         margin-top: 2px !important;
         margin-bottom: 3px !important;
     }
-    /* 1~4번 탭 고대비 세그먼트 카드 내비게이션 스타일 (React Aria & BaseWeb 완벽 대응) */
+    /* 1~4번 탭 메뉴: 선택 시 언더바(Underbar) 내비게이션 스타일 */
     div[data-testid="stTabs"],
     .stTabs {
         margin-top: 4px !important;
-        margin-bottom: 6px !important;
+        margin-bottom: 8px !important;
         position: relative !important;
         z-index: 10 !important;
         clear: both !important;
@@ -595,14 +595,15 @@ st.markdown("""
     div[data-testid="stTabs"] [role="tablist"],
     .stTabs [role="tablist"],
     div[data-baseweb="tab-list"] {
-        gap: 8px !important;
-        background: #F1F5F9 !important;
-        padding: 4px 6px !important;
-        border-radius: 8px !important;
-        border: 1px solid #CBD5E1 !important;
+        gap: 16px !important;
+        background: transparent !important;
+        padding: 0px 4px !important;
+        border: none !important;
+        border-bottom: 2px solid #E2E8F0 !important;
+        border-radius: 0px !important;
         display: flex !important;
         flex-wrap: nowrap !important;
-        align-items: stretch !important;
+        align-items: flex-end !important;
         min-height: 40px !important;
         box-sizing: border-box !important;
     }
@@ -620,35 +621,30 @@ st.markdown("""
         padding-top: 0px !important;
         padding-bottom: 0px !important;
     }
-    /* 기본 언더라인 및 인디케이터 완전 제거 */
-    div[data-testid="stTabs"] [role="tablist"]::after,
-    .stTabs [role="tablist"]::after,
-    div[data-testid="stTabs"] .react-aria-SelectionIndicator,
-    .stTabs .react-aria-SelectionIndicator,
+    /* 기본 인디케이터 초기화 */
     div[data-baseweb="tab-highlight"],
     div[data-baseweb="tab-border"] {
         display: none !important;
-        content: none !important;
-        height: 0px !important;
-        opacity: 0 !important;
     }
-    /* 비활성 탭: 독립된 화이트 카드 버튼과 테두리 */
+    /* 비활성 탭: 배경 없는 텍스트 버튼 (투명 배경) */
     div[data-testid="stTabs"] button[role="tab"],
     .stTabs button[role="tab"],
     button[data-baseweb="tab"] {
         flex: 1 1 0px !important;
         text-align: center !important;
-        font-size: 0.86rem !important;
+        font-size: 0.88rem !important;
         font-weight: 600 !important;
-        padding: 6px 12px !important;
-        height: 32px !important;
-        min-height: 32px !important;
-        background: #FFFFFF !important;
-        color: #334155 !important;
-        border: 1px solid #CBD5E1 !important;
-        border-radius: 6px !important;
+        padding: 8px 12px !important;
+        height: 38px !important;
+        min-height: 38px !important;
+        background: transparent !important;
+        color: #64748B !important;
+        border: none !important;
+        border-bottom: 3px solid transparent !important;
+        margin-bottom: -2px !important;
+        border-radius: 0px !important;
         transition: all 0.15s ease-in-out !important;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+        box-shadow: none !important;
         cursor: pointer !important;
     }
     div[data-testid="stTabs"] button[role="tab"] *,
@@ -661,30 +657,33 @@ st.markdown("""
     div[data-testid="stTabs"] button[role="tab"]:hover,
     .stTabs button[role="tab"]:hover,
     button[data-baseweb="tab"]:hover {
-        background: #F8FAFC !important;
-        border-color: #94A3B8 !important;
-        color: #0F172A !important;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06) !important;
+        background: transparent !important;
+        border-color: transparent !important;
+        border-bottom: 3px solid #CBD5E1 !important;
+        color: #1E293B !important;
+        box-shadow: none !important;
     }
-    /* 활성 탭: 짙은 네이비 배경에 순백색 텍스트로 즉각적인 구별 */
+    /* 활성 탭: 선택 시 명확한 블루 텍스트 및 3px 언더바(Underbar) 표시 */
     div[data-testid="stTabs"] button[role="tab"][aria-selected="true"],
     .stTabs button[role="tab"][aria-selected="true"],
     div[data-testid="stTabs"] button[role="tab"][data-selected],
     .stTabs button[role="tab"][data-selected],
     button[data-baseweb="tab"][aria-selected="true"] {
-        background: #1E293B !important;
-        color: #FFFFFF !important;
-        font-weight: 800 !important;
-        border: 1px solid #0F172A !important;
-        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.20) !important;
+        background: transparent !important;
+        color: #2563EB !important;
+        font-weight: 700 !important;
+        border: none !important;
+        border-bottom: 3px solid #2563EB !important;
+        margin-bottom: -2px !important;
+        box-shadow: none !important;
     }
     div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] *,
     .stTabs button[role="tab"][aria-selected="true"] *,
     div[data-testid="stTabs"] button[role="tab"][data-selected] *,
     .stTabs button[role="tab"][data-selected] *,
     button[data-baseweb="tab"][aria-selected="true"] * {
-        color: #FFFFFF !important;
-        font-weight: 800 !important;
+        color: #2563EB !important;
+        font-weight: 700 !important;
     }
     .stMarkdown table {
         font-size: 0.78rem !important;
@@ -1252,9 +1251,12 @@ st.markdown("""
         div[data-testid="stTabs"] [role="tablist"],
         .stTabs [role="tablist"],
         div[data-baseweb="tab-list"] {
-            gap: 4px !important;
-            padding: 3px 4px !important;
-            border-radius: 6px !important;
+            gap: 8px !important;
+            padding: 0px 2px !important;
+            background: transparent !important;
+            border: none !important;
+            border-bottom: 2px solid #E2E8F0 !important;
+            border-radius: 0px !important;
             display: flex !important;
             flex-wrap: nowrap !important;
             overflow-x: auto !important;
@@ -1268,13 +1270,29 @@ st.markdown("""
         div[data-testid="stTabs"] button[role="tab"],
         .stTabs button[role="tab"],
         button[data-baseweb="tab"] {
-            font-size: 0.72rem !important;
-            padding: 4px 8px !important;
-            height: 28px !important;
-            min-height: 28px !important;
-            border-radius: 5px !important;
+            font-size: 0.76rem !important;
+            padding: 6px 10px !important;
+            height: 34px !important;
+            min-height: 34px !important;
+            background: transparent !important;
+            color: #64748B !important;
+            border: none !important;
+            border-bottom: 3px solid transparent !important;
+            margin-bottom: -2px !important;
+            border-radius: 0px !important;
             white-space: nowrap !important;
             flex: 0 0 auto !important;
+            box-shadow: none !important;
+        }
+        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"],
+        .stTabs button[role="tab"][aria-selected="true"],
+        button[data-baseweb="tab"][aria-selected="true"] {
+            background: transparent !important;
+            color: #2563EB !important;
+            font-weight: 700 !important;
+            border: none !important;
+            border-bottom: 3px solid #2563EB !important;
+            box-shadow: none !important;
         }
 
         /* Global Regime & Reference Time: 모바일에서 기준시각을 글로벌 체제 박스 바로 아래로 명확히 배치 */
