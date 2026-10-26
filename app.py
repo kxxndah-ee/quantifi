@@ -9,6 +9,7 @@ Tab 3: 예측 다이어리 & 라이브 추적 (Model Decay 감지)
 import os
 import sys
 import re
+import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
@@ -92,9 +93,6 @@ from src.database.diary_manager import (
     evaluate_model_decay
 )
 from src.core.screening_worker import get_screening_worker
-import importlib
-import src.core.quant_analyst as _qa_mod
-importlib.reload(_qa_mod)
 from src.core.quant_analyst import (
     generate_quant_expert_answer,
     extract_stock_and_question_from_query,
@@ -472,6 +470,24 @@ st.markdown("""
     @media (max-width: 768px) {
         .macro-metrics-grid {
             grid-template-columns: repeat(3, 1fr) !important;
+        }
+    }
+    .domestic-metrics-grid {
+        display: grid !important;
+        grid-template-columns: repeat(7, 1fr) !important;
+        gap: 8px !important;
+        width: 100% !important;
+        margin: 6px 0 10px 0 !important;
+        box-sizing: border-box !important;
+    }
+    @media (max-width: 1024px) {
+        .domestic-metrics-grid {
+            grid-template-columns: repeat(4, 1fr) !important;
+        }
+    }
+    @media (max-width: 640px) {
+        .domestic-metrics-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
         }
     }
     /* Compact alert styling for warnings and alerts (Image 3) */
@@ -1428,8 +1444,10 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Initialize Database on app start
-init_db()
+# Initialize Database on app start (once per session)
+if "db_initialized" not in st.session_state:
+    init_db()
+    st.session_state["db_initialized"] = True
 
 
 # ---------------------------------------------------------
@@ -1494,12 +1512,14 @@ with st.sidebar:
 @st.cache_data(ttl=300, show_spinner=False)
 def load_all_watchlist_metrics(codes_tuple):
     """
-    Fast batch evaluator for watchlist stocks.
-    Loads parquet caches in parallel/batch and computes point-in-time scores.
+    Fast parallel batch evaluator for watchlist stocks.
+    Loads parquet caches in parallel threads and computes point-in-time scores.
     """
-    results = []
+    from concurrent.futures import ThreadPoolExecutor
+
     bm_ohlcv = get_benchmark_ohlcv()
-    for item in codes_tuple:
+
+    def _eval_one(item):
         if len(item) == 6:
             code, name, market, sector, notes, group_name = item
         else:
@@ -1599,7 +1619,7 @@ def load_all_watchlist_metrics(codes_tuple):
             bb_pct=bk.get("bb_pct", 0.5)
         )
 
-        results.append({
+        return {
             "code": code,
             "name": name,
             "group_name": group_name or "기본그룹",
@@ -1630,7 +1650,11 @@ def load_all_watchlist_metrics(codes_tuple):
             "bb_pct": bk.get("bb_pct", 0.5),
             "verified_badge": badge,
             "breakdown": bk,
-        })
+        }
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = list(executor.map(_eval_one, codes_tuple))
+
     return results
 
 
@@ -1862,6 +1886,21 @@ def _safe_float_val(v, default=0.0) -> float:
         return default if math.isnan(f) else f
     except Exception:
         return default
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _get_cached_meta_opt():
+    return evaluate_multi_horizon_tuning_impact()
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _get_cached_decay_info():
+    return evaluate_model_decay(expected_ci_lower=50.0)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _get_cached_weekly_res(limit_days=5):
+    return get_weekly_verification_summary(limit_days=limit_days)
 
 
 @st.cache_data(ttl=600, show_spinner=False)
@@ -2800,13 +2839,13 @@ def render_analyst_factsheet_and_qa_tab():
         if st.button("4번 5년 백테스트 검증", key=f"btn_tab2_to_bt_{code}", use_container_width=True):
             st.session_state["target_backtest_code"] = code
             st.session_state["verif_pipeline_mode_sel"] = "과거 5년 워크포워드 & KODEX 200 벤치마크 검증 (종목별 95% 신뢰구간 시뮬레이션)"
-            st.session_state["main_active_tab_nav"] = main_tab_names[3]
+            st.session_state["pending_active_tab"] = main_tab_names[3]
             st.toast(f"{name} 백테스트 설정 완료! 4번 통합 성과 검증 탭을 확인하세요.")
             st.rerun()
 
     with act_c3:
         if st.button("3번 관심종목 탭으로 이동", key=f"btn_tab2_to_wl_{code}", use_container_width=True):
-            st.session_state["main_active_tab_nav"] = main_tab_names[2]
+            st.session_state["pending_active_tab"] = main_tab_names[2]
             st.rerun()
 
     with act_c4:
@@ -2820,25 +2859,68 @@ main_tab_names = [
     "4. 검증 및 최적화",
 ]
 
-if "main_active_tab_nav" in st.session_state:
-    _cur_nav = str(st.session_state["main_active_tab_nav"])
-    if _cur_nav not in main_tab_names:
-        if any(w in _cur_nav for w in ["4", "5", "검증", "최적화", "다이어리", "워크포워드"]):
-            st.session_state["main_active_tab_nav"] = main_tab_names[3]
-        elif any(w in _cur_nav for w in ["3", "관심", "스코어보드"]):
-            st.session_state["main_active_tab_nav"] = main_tab_names[2]
-        elif any(w in _cur_nav for w in ["2", "애널리스트", "팩트시트", "Q&A"]):
-            st.session_state["main_active_tab_nav"] = main_tab_names[1]
-        else:
-            st.session_state["main_active_tab_nav"] = main_tab_names[0]
-else:
-    st.session_state["main_active_tab_nav"] = main_tab_names[0]
 
-_def_tab = st.session_state.get("main_active_tab_nav", main_tab_names[0])
-if _def_tab not in main_tab_names:
-    _def_tab = main_tab_names[0]
+def render_domestic_market_ticker_bar():
+    """
+    Renders Real-time Domestic Market Indices & Bitcoin Overview.
+    Displays KOSPI, KOSDAQ, KOSPI 200, KOSPI 200 Futures, KOSDAQ 150, Korea Value-up, and Bitcoin (BTC).
+    Placed directly above US Market bar in Screener (Tab 1).
+    """
+    from src.collectors.domestic_indices import fetch_domestic_indices_summary
 
-tab1, tab2, tab3, tab4 = st.tabs(main_tab_names, default=_def_tab, key="main_active_tab_nav", on_change="rerun")
+    summary = fetch_domestic_indices_summary()
+    items = summary.get("items", [])
+    updated_at_str = summary.get("updated_at_str", "")
+    summary_text = summary.get("summary_text", "")
+
+    title_summary = f"[국내 주요 지수 및 비트코인 실시간 시황] {summary_text}"
+
+    with st.expander(title_summary, expanded=True):
+        top_c1, top_c2 = st.columns([4.2, 1.2])
+        with top_c1:
+            st.markdown(
+                f'<div class="regime-status-bar">'
+                f'<div class="regime-badge-container">'
+                f'<span class="regime-badge" style="background:#0F172A; color:#FFFFFF; font-weight:700; font-size:0.75rem; padding:3px 8px; border-radius:4px; display:inline-block;">'
+                f'국내 정규장 & 가상자산 실시간 시세'
+                f'</span>'
+                f'</div>'
+                f'<div class="regime-time-container">'
+                f'<span class="regime-time" style="color:#64748B; font-size:0.72rem; display:inline-block;">기준시각: {updated_at_str}</span>'
+                f'</div>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+        with top_c2:
+            if st.button("국내/코인 시세 갱신", key="btn_refresh_domestic_indices", use_container_width=True):
+                fetch_domestic_indices_summary(force_refresh=True)
+                st.toast("국내 주요 지수 및 비트코인 시세를 새로 수신했습니다.")
+                st.rerun()
+
+        cards_html = []
+        for it in items:
+            label = it.get("name", "")
+            disp_price = it.get("display_price", "0.00")
+            chg_pct = it.get("change_pct", 0.0)
+            color = "#DC2626" if chg_pct > 0 else ("#2563EB" if chg_pct < 0 else "#475569")
+            sign = "+" if chg_pct > 0 else ""
+            chg_str = f"{sign}{chg_pct:.2f}%"
+
+            card_html = (
+                f'<div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 4px 8px 4px; text-align:center; box-sizing:border-box;">'
+                f'<div style="font-size:0.70rem; color:#64748B; font-weight:600; margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{label}">{label}</div>'
+                f'<div style="font-size:0.84rem; font-weight:700; color:#1E293B; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{disp_price}</div>'
+                f'<div style="font-size:0.72rem; font-weight:700; color:{color}; line-height:1.25; margin-top:3px; white-space:nowrap;">{chg_str}</div>'
+                f'</div>'
+            )
+            cards_html.append(card_html)
+
+        grid_html = (
+            f'<div class="domestic-metrics-grid" style="display:grid; grid-template-columns:repeat(7, 1fr); gap:8px; width:100%; margin:6px 0 6px 0; box-sizing:border-box;">'
+            + "".join(cards_html) +
+            f'</div>'
+        )
+        st.markdown(grid_html, unsafe_allow_html=True)
 
 
 def render_us_market_macro_bar():
@@ -2942,9 +3024,39 @@ def render_us_market_macro_bar():
 
 
 # =========================================================
+# MAIN TAB NAVIGATION LIFECYCLE
+# =========================================================
+# Apply pending tab switch BEFORE st.tabs is instantiated
+if "pending_active_tab" in st.session_state:
+    st.session_state["main_active_tab_nav"] = st.session_state.pop("pending_active_tab")
+
+if "main_active_tab_nav" in st.session_state:
+    _cur_nav = str(st.session_state["main_active_tab_nav"])
+    if _cur_nav not in main_tab_names:
+        if any(w in _cur_nav for w in ["4", "5", "검증", "최적화", "다이어리", "워크포워드"]):
+            st.session_state["main_active_tab_nav"] = main_tab_names[3]
+        elif any(w in _cur_nav for w in ["3", "관심", "스코어보드"]):
+            st.session_state["main_active_tab_nav"] = main_tab_names[2]
+        elif any(w in _cur_nav for w in ["2", "애널리스트", "팩트시트", "Q&A"]):
+            st.session_state["main_active_tab_nav"] = main_tab_names[1]
+        else:
+            st.session_state["main_active_tab_nav"] = main_tab_names[0]
+else:
+    st.session_state["main_active_tab_nav"] = main_tab_names[0]
+
+
+_def_tab = st.session_state.get('main_active_tab_nav', main_tab_names[0])
+if _def_tab not in main_tab_names:
+    _def_tab = main_tab_names[0]
+
+tab1, tab2, tab3, tab4 = st.tabs(main_tab_names, default=_def_tab)
+
+
+# =========================================================
 # TAB 1: 시장 전체 익일 상승 후보 & 고확신 스크리너
 # =========================================================
 with tab1:
+    render_domestic_market_ticker_bar()
     render_us_market_macro_bar()
 
     sc_mode_options = [
@@ -3473,7 +3585,7 @@ with tab1:
             else:
                 st.caption("Point-in-Time 스코어링 엔진으로 전체 상장 유니버스를 일괄 스크리닝하고 테마 집중 위험을 감지합니다. (권장: 최소 스코어 65점↑, 거래량 급증 1.5배↑)")
 
-    # 2) 전 전략 모드 공통 스크리너 필터 파라미터 툴바 (전수조사 기본 세팅 & 접기 적용)
+    # 2) 전 전략 모드 공통 스크리너 필터 파라미터 툴바 ([스크리너 필터 설정] 전 상장사 전수조사 기본 세팅 & 접기 적용)
     with st.expander(f"[스크리너 필터 설정] {st.session_state.get('sc_scope_sel', full_scope_default)} · {now_str} {rec_time['slot_name']} ({rec_time['badge_desc']} 자동 세팅됨)", expanded=False):
         f_hdr_c1, f_hdr_c2 = st.columns([4.2, 1.3])
         with f_hdr_c1:
@@ -4053,7 +4165,7 @@ with tab1:
                     if st.button(f"{sel_sc['name']} 7년 백테스트 실행", type="primary", key=f"bt_sc_btn_{sel_sc['code']}", use_container_width=True):
                         st.session_state["target_backtest_code"] = sel_sc["code"]
                         st.session_state["verif_pipeline_mode_sel"] = "과거 5년 워크포워드 & KODEX 200 벤치마크 검증 (종목별 95% 신뢰구간 시뮬레이션)"
-                        st.session_state["main_active_tab_nav"] = main_tab_names[3]
+                        st.session_state["pending_active_tab"] = main_tab_names[3]
                         st.toast(f"{sel_sc['name']} 백테스트 설정 완료! 4번 통합 성과 검증 탭을 확인하세요.")
                         st.rerun()
                 with insp_btn2:
@@ -4061,7 +4173,7 @@ with tab1:
                     if st.button("2번 애널리스트 콘솔 이동", key=f"btn_insp_to_tab2_{sel_sc['code']}", use_container_width=True):
                         st.session_state["qa_console_target_code"] = sel_sc["code"]
                         st.session_state["qa_has_active_result"] = True
-                        st.session_state["main_active_tab_nav"] = main_tab_names[1]
+                        st.session_state["pending_active_tab"] = main_tab_names[1]
                         st.toast(f"{sel_sc['name']} 2번 수석 애널리스트 콘솔로 이동합니다.")
                         st.rerun()
 
@@ -4127,14 +4239,14 @@ with tab1:
                             if st.button("백테스트", key=f"card_bt_sc_{srow['code']}_{i}", use_container_width=True):
                                 st.session_state["target_backtest_code"] = srow["code"]
                                 st.session_state["verif_pipeline_mode_sel"] = "과거 5년 워크포워드 & KODEX 200 벤치마크 검증 (종목별 95% 신뢰구간 시뮬레이션)"
-                                st.session_state["main_active_tab_nav"] = main_tab_names[3]
+                                st.session_state["pending_active_tab"] = main_tab_names[3]
                                 st.toast(f"{srow['name']} 백테스트 설정 완료! 4번 통합 성과 검증 탭을 확인하세요.")
                                 st.rerun()
                         with c_b3:
                             if st.button("수석 애널리스트 Q&A", key=f"card_qa_sc_{srow['code']}_{i}", use_container_width=True):
                                 st.session_state["qa_console_target_code"] = srow["code"]
                                 st.session_state["qa_has_active_result"] = True
-                                st.session_state["main_active_tab_nav"] = main_tab_names[1]
+                                st.session_state["pending_active_tab"] = main_tab_names[1]
                                 st.toast(f"{srow['name']} 2번 수석 애널리스트 콘솔로 이동합니다.")
                                 st.rerun()
 
@@ -4578,7 +4690,7 @@ with tab3:
                     if st.button(f"{sel_row['name']} 7년 백테스트 실행", type="primary", key=f"bt_wl_btn_{sel_row['code']}", use_container_width=True):
                         st.session_state["target_backtest_code"] = sel_row["code"]
                         st.session_state["verif_pipeline_mode_sel"] = "과거 5년 워크포워드 & KODEX 200 벤치마크 검증 (종목별 95% 신뢰구간 시뮬레이션)"
-                        st.session_state["main_active_tab_nav"] = main_tab_names[3]
+                        st.session_state["pending_active_tab"] = main_tab_names[3]
                         st.toast(f"{sel_row['name']} 백테스트 설정 완료! 4번 통합 성과 검증 탭을 확인하세요.")
                         st.rerun()
                 with insp_btn2:
@@ -4586,7 +4698,7 @@ with tab3:
                     if st.button("2번 애널리스트 Q&A", key=f"btn_wl_to_qa_{sel_row['code']}", use_container_width=True):
                         st.session_state["qa_console_target_code"] = sel_row["code"]
                         st.session_state["qa_has_active_result"] = True
-                        st.session_state["main_active_tab_nav"] = main_tab_names[1]
+                        st.session_state["pending_active_tab"] = main_tab_names[1]
                         st.toast(f"{sel_row['name']} 2번 수석 애널리스트 콘솔로 이동합니다.")
                         st.rerun()
                 with insp_btn3:
@@ -4659,7 +4771,7 @@ with tab3:
                             if st.button("백테스트", key=f"bt_card_{item['code']}", use_container_width=True):
                                 st.session_state["target_backtest_code"] = item["code"]
                                 st.session_state["verif_pipeline_mode_sel"] = "과거 5년 워크포워드 & KODEX 200 벤치마크 검증 (종목별 95% 신뢰구간 시뮬레이션)"
-                                st.session_state["main_active_tab_nav"] = main_tab_names[3]
+                                st.session_state["pending_active_tab"] = main_tab_names[3]
                                 st.toast(f"{item['name']} 백테스트 설정됨! 4번 통합 성과 검증 탭을 확인하세요.")
                                 st.rerun()
                         with btn_c2:
@@ -4670,6 +4782,7 @@ with tab3:
                                     conn.commit()
                                 st.cache_data.clear()
                                 st.rerun()
+
 
 
 
@@ -4963,9 +5076,36 @@ def render_prediction_diary_section():
 # =========================================================
 # SUB-MODULE C: 실거래 성과 통합 검증 & AI 자가최적화 (All-in-One)
 # =========================================================
+@st.cache_data(ttl=300, show_spinner=False)
+def _get_cached_meta_opt():
+    return evaluate_multi_horizon_tuning_impact()
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _get_cached_decay_info():
+    return evaluate_model_decay(expected_ci_lower=50.0)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _get_cached_weekly_res(limit_days=5):
+    return get_weekly_verification_summary(limit_days=limit_days)
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _get_quick_pit_verification_res(pred_d: str, strat: str):
+    return run_daily_point_in_time_verification(
+        pred_date=pred_d,
+        strategy_mode=strat,
+        min_val_krw=10_000_000_000,
+        score_cutoff=65.0,
+        sample_pool_size=40,
+        force_refresh=False
+    )
+
+
 def render_unified_verification_and_tuning_section():
-    # 1. Multi-Horizon AI Optimization Analysis
-    meta_opt = evaluate_multi_horizon_tuning_impact()
+    # 1. Multi-Horizon AI Optimization Analysis (Instant with cache)
+    meta_opt = _get_cached_meta_opt()
     best_horizon_lbl = meta_opt["best_horizon_label"]
     best_ret = meta_opt["best_expected_return"]
     best_win = meta_opt["best_expected_win_rate"]
@@ -4974,21 +5114,54 @@ def render_unified_verification_and_tuning_section():
     # Master Action Header: One Button for Both Verification and Application
     m_hdr_c1, m_hdr_c2 = st.columns([3.3, 1.7], vertical_alignment="center")
     with m_hdr_c1:
-        st.markdown('<div class="office-heading" style="font-size:1.05rem; font-weight:700; color:#0F172A; margin:0;">[통합 성과 검증 & AI 최적화 원클릭 센터]</div>', unsafe_allow_html=True)
-        st.caption("단 하나의 버튼으로 미정산 내역 정산, 다주기(전일·주간·1개월) 실거래 성과 검증, AI 실패 원인 진단 및 최고 수익률 파라미터를 1번 스크리너에 즉시 자동 적용합니다.")
+        st.markdown('<div class="office-heading" style="font-size:1.05rem; font-weight:700; color:#0F172A; margin:0;">[통합 성과 검증 & AI 최적화 센터]</div>', unsafe_allow_html=True)
     with m_hdr_c2:
-        if st.button("원클릭 검증 & 최적화 즉시 적용", type="primary", use_container_width=True, key="btn_run_all_in_one_master"):
-            with st.spinner("미정산 체결 내역 정산, 다주기 성과 검증 및 최적화 파라미터 적용 중..."):
-                settle_pending_predictions()
-                run_weekly_batch_verification(limit_days=5, force_refresh=True)
-                st.session_state["pending_tuning_updates"] = best_props
-                st.session_state["tuning_applied_notification"] = True
-                st.session_state["last_master_run_at"] = get_now_kst().strftime("%Y-%m-%d %H:%M:%S")
-                st.session_state["last_master_best_horizon"] = best_horizon_lbl
-                st.session_state["last_master_best_ret"] = best_ret
-                st.session_state["last_master_best_win"] = best_win
-                st.toast(f"통합 검증 완료! AI 최고 추천 주기({best_horizon_lbl})의 최적 파라미터가 1번 스크리너에 즉시 적용되었습니다.")
-                st.rerun()
+        btn_ph = st.empty()
+        if btn_ph.button("검증&최적화", type="primary", use_container_width=True, key="btn_run_all_in_one_master"):
+            def _render_btn_pct(pct_str: str):
+                btn_ph.markdown(
+                    f'''
+                    <div style="width:100%; display:flex;">
+                        <button disabled style="
+                            width: 100%;
+                            background: #2563EB;
+                            color: #FFFFFF;
+                            padding: 0.55rem 1rem;
+                            border-radius: 0.5rem;
+                            border: none;
+                            font-weight: 700;
+                            font-size: 0.95rem;
+                            cursor: wait;
+                            opacity: 0.95;
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                            text-align: center;
+                        ">{pct_str}</button>
+                    </div>
+                    ''',
+                    unsafe_allow_html=True
+                )
+            _render_btn_pct("검증&최적화(0%)")
+            time.sleep(0.35)
+            settle_pending_predictions()
+            _render_btn_pct("검증&최적화(35%)")
+            time.sleep(0.35)
+            run_weekly_batch_verification(limit_days=5, force_refresh=False)
+            _render_btn_pct("검증&최적화(75%)")
+            time.sleep(0.35)
+            _get_cached_meta_opt.clear()
+            _get_cached_decay_info.clear()
+            _get_cached_weekly_res.clear()
+            _get_quick_pit_verification_res.clear()
+            st.session_state["pending_tuning_updates"] = best_props
+            st.session_state["tuning_applied_notification"] = True
+            st.session_state["last_master_run_at"] = get_now_kst().strftime("%Y-%m-%d %H:%M:%S")
+            st.session_state["last_master_best_horizon"] = best_horizon_lbl
+            st.session_state["last_master_best_ret"] = best_ret
+            st.session_state["last_master_best_win"] = best_win
+            _render_btn_pct("검증&최적화(100%)")
+            time.sleep(0.40)
+            st.toast(f"검증&최적화 완료! AI 최고 추천 주기({best_horizon_lbl})의 최적 파라미터가 1번 스크리너에 즉시 적용되었습니다.")
+            st.rerun()
 
     # 2. Status Notification Banner
     if st.session_state.get("tuning_applied_notification") or "last_master_run_at" in st.session_state:
@@ -5001,7 +5174,7 @@ def render_unified_verification_and_tuning_section():
             <div style="background:#F0FDF4; border:1px solid #86EFAC; border-radius:6px; padding:10px 14px; margin:8px 0 12px 0;">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
                     <span style="font-size:0.92rem; font-weight:700; color:#15803D;">
-                        [검증 및 최적화 즉시 적용 완료] AI 최고 추천 주기({h_lbl}) 파라미터가 스크리너(1번 탭)에 반영되었습니다!
+                        [검증&최적화 완료] AI 최고 추천 주기({h_lbl}) 파라미터가 스크리너(1번 탭)에 반영되었습니다!
                     </span>
                     <span style="font-size:0.80rem; font-weight:700; background:#DCFCE7; color:#166534; padding:2px 8px; border-radius:4px; border:1px solid #BBF7D0;">
                         예상 순수익률: +{e_ret:.2f}% | 예상 승률: {e_win:.1f}%
@@ -5017,9 +5190,9 @@ def render_unified_verification_and_tuning_section():
         if st.session_state.get("tuning_applied_notification"):
             st.session_state["tuning_applied_notification"] = False
 
-    # 3. Model Health Card & Core KPIs
-    decay_info = evaluate_model_decay(expected_ci_lower=50.0)
-    weekly_res = get_weekly_verification_summary(limit_days=5)
+    # 3. Model Health Card & Core KPIs (Instant with cache)
+    decay_info = _get_cached_decay_info()
+    weekly_res = _get_cached_weekly_res(limit_days=5)
 
     k1, k2, k3, k4 = st.columns(4)
     with k1:
@@ -5060,7 +5233,7 @@ def render_unified_verification_and_tuning_section():
         f"""
         <div style="background:#F8FAFC; border:1px solid #CBD5E1; border-radius:6px; padding:10px 14px; margin-bottom:10px;">
             <div style="font-size:0.85rem; font-weight:700; color:#0F172A;">
-                AI 수익률 극대화 최적 추천 주기: <span style="color:#0284C7;">{best_horizon_lbl}</span> (원클릭 자동 적용)
+                AI 수익률 극대화 최적 추천 주기: <span style="color:#0284C7;">{best_horizon_lbl}</span> (자동 추천 적용)
             </div>
             <div style="font-size:0.78rem; color:#475569; margin-top:4px;">
                 {meta_opt["best_rationale"]}
@@ -5075,14 +5248,7 @@ def render_unified_verification_and_tuning_section():
     with st.expander("[최근 실거래 성적표 & 상세 검증 내역 보기]", expanded=False):
         valid_pairs = get_valid_prediction_dates(limit=30)
         latest_pred_d = valid_pairs[-1][0] if valid_pairs else "2026-09-22"
-        v_res = run_daily_point_in_time_verification(
-            pred_date=latest_pred_d,
-            strategy_mode="실시간 당일 단타 (5% 익절)",
-            min_val_krw=10_000_000_000,
-            score_cutoff=65.0,
-            sample_pool_size=150,
-            force_refresh=False
-        )
+        v_res = _get_quick_pit_verification_res(latest_pred_d, "실시간 당일 단타 (5% 익절)")
         if v_res and "df_results" in v_res:
             df_res = v_res["df_results"]
             disp_cols = [

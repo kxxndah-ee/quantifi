@@ -3,6 +3,7 @@ showErrorDetails = "full"
 
 [server]
 headless = true
+runOnSave = true
 enableCORS = false
 enableXsrfProtection = false
 

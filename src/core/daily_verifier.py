@@ -35,12 +35,23 @@ ALL_VERIF_STRATEGIES = [
 ]
 
 
+_DATES_CACHE_TS = 0.0
+_DATES_CACHE_DATA = None
+
+
 def get_available_trading_dates(limit: int = 30) -> List[str]:
-    """Returns recent trading dates from benchmark OHLCV."""
+    """Returns recent trading dates from benchmark OHLCV with 10-minute in-memory cache."""
+    global _DATES_CACHE_TS, _DATES_CACHE_DATA
+    import time
+    now = time.time()
+    if _DATES_CACHE_DATA is not None and (now - _DATES_CACHE_TS) < 600:
+        return _DATES_CACHE_DATA[-limit:]
     try:
         bm = get_benchmark_ohlcv()
         if not bm.empty:
             dates = [d.strftime("%Y-%m-%d") for d in bm.index]
+            _DATES_CACHE_DATA = dates
+            _DATES_CACHE_TS = now
             return dates[-limit:]
     except Exception:
         pass

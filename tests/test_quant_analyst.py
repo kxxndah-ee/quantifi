@@ -122,6 +122,38 @@ class TestQuantAnalyst(unittest.TestCase):
         self.assertIn("08:00~08:50", ans)
         self.assertIn("동시호가", ans)
 
+    def test_pullback_dip_entry_query(self):
+        # 1. Exact query: "로보티즈 진입 눌림목 알려줘"
+        robotis = {
+            "name": "로보티즈",
+            "code": "108490",
+            "market": "KOSDAQ",
+            "sector": "로봇",
+            "close": 251250,
+            "change_pct": 11.67,
+            "open": 235000,
+            "high": 258000,
+            "low": 232000,
+            "prev_close": 225000,
+            "volume": 1500000,
+            "score": 57.5,
+            "rsi": 46.4,
+            "tp_pct": 5.0,
+            "sl_pct": 2.5
+        }
+        ans = generate_quant_expert_answer(robotis, "로보티즈 진입 눌림목 알려줘")
+        self.assertIn("> **[수석 애널리스트 핵심 직답]**:", ans)
+        self.assertIn("눌림목 구간", ans)
+        self.assertIn("1차 공격적 눌림선", ans)
+        self.assertIn("2차 정석 황금 지지선", ans)
+        self.assertIn("3차 최종 마지노선", ans)
+        self.assertIn("246,000원 ~ 248,000원", ans)
+
+        # 2. Query variations
+        ans_calc = generate_quant_expert_answer(robotis, "진입을 위해서 눌림목 구간 계산해줘")
+        self.assertIn("눌림목 구간", ans_calc)
+        self.assertIn("246,000원 ~ 248,000원", ans_calc)
+
 
 if __name__ == "__main__":
     unittest.main()

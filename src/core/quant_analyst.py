@@ -121,8 +121,9 @@ def _call_gemini_quant_expert(
     system_instruction = (
         "당신은 대한민국 주식 시장에 특화된 최고 수준의 '수석 퀀트 트레이더 및 기술적 분석가(Chief Quant Analyst)'입니다.\n"
         "[답변 원칙 (최우선)]: 질문에 대해 배경 분석이나 지표만 나열하지 말고, 반드시 답변 맨 첫 줄에 '> **[수석 애널리스트 핵심 직답]**: ...' 형식으로 "
-        "사용자가 질문한 핵심(예: 1시 이후 상승 여력 판정, 매수 진입 가부, 목표가 등)에 대한 명쾌하고 단정적인 결론을 1~2문장으로 즉시 직접 답변한 뒤, "
+        "사용자가 질문한 핵심(예: 1시 이후 상승 여력 판정, 눌림목 구간 계산, 매수 진입 가부, 목표가 등)에 대한 명쾌하고 단정적인 결론을 1~2문장으로 즉시 직접 답변한 뒤, "
         "그 아래에 구체적인 퀀트 수치 근거(가격, 수익률 %, 지지/저항선)와 시간대별 실행 시나리오를 설명하세요.\n"
+        "특히 '눌림목', '조정 구간', '되돌림 타점' 질문 시에는 반드시 구체적인 1차/2차/3차 눌림목 가격 수치와 권장 분할 매수 가격 밴드를 명시하십시오.\n"
         "제공된 종목들의 실제 체결 데이터, 거래량 급증비, 이평선 배열, RSI, 퀀트 스코어, 목표가/손절가를 바탕으로 "
         "사용자의 단일 또는 복수 종목 비교·복합 질문에 객관적이며 신뢰도 높은 전문가 분석 답변을 한국어로 제공하세요.\n"
         "또한 전일 미국 증시(나스닥, S&P 500, 필라델피아 반도체 SOXX, 환율) 동향과 국내 섹터별 상관관계를 반영하여 글로벌 매크로 관점의 리스크도 함께 조언하세요.\n"
@@ -410,7 +411,110 @@ def _built_in_quant_reasoning(
 - 한 번에 전량 진입(몰빵)하기보다 2회 분할 매수로 평균단가 우위를 확보하고, **{tp_price:,.0f}원** 터치 시 50% 수익 확정을 권장합니다.
 """
 
-    # 3. 지금 사도 되나요? / 진입 가능 여부 / 추격매수 진단
+    # 3. 눌림목 / 눌림목 구간 / 되돌림 분할 진입 타점 계산
+    elif any(k in q_lower for k in [
+        "눌림", "눌림목", "눌림자리", "눌림타점", "눌림구간", "눌림가격", "눌림가", "눌림선", "눌림매수",
+        "조정", "되돌림", "조정구간", "조정자리", "조정폭", "조정가격", "조정받", "조정올", "조정오",
+        "딥매수", "딥바이", "눌러줄", "눌릴", "눌리면", "눌러주면", "눌린", "눌러"
+    ]):
+        # 파동 기준점 산출 (Intraday or Short-term Wave Swing)
+        wave_low = min(open_p, low_p) if (open_p > 0 and low_p > 0) else (prev_close if prev_close > 0 else close * 0.95)
+        wave_high = max(high_p, close)
+        wave_height = max(1.0, wave_high - wave_low)
+
+        # 1차 공격적 얕은 눌림목 (피보나치 0.382 되돌림 / 시초가 및 피벗 상단 지지)
+        if wave_height / max(1.0, close) >= 0.02:
+            dip_1_raw = wave_high - (wave_height * 0.382)
+            if open_p > 0 and wave_low < open_p < wave_high and abs(open_p - dip_1_raw) / wave_high < 0.03:
+                dip_1_raw = (dip_1_raw + open_p) / 2.0
+        else:
+            dip_1_raw = close * 0.985
+
+        # 2차 정석 황금 눌림목 (피보나치 0.500 하프 되돌림 / 5일선 및 피벗 중심선 지지)
+        if wave_height / max(1.0, close) >= 0.02:
+            dip_2_raw = wave_high - (wave_height * 0.500)
+            if pivot_price > 0 and abs(pivot_price - dip_2_raw) / wave_high < 0.04:
+                dip_2_raw = (dip_2_raw + pivot_price) / 2.0
+            elif ma5 > 0 and abs(ma5 - dip_2_raw) / wave_high < 0.04:
+                dip_2_raw = (dip_2_raw + ma5) / 2.0
+        else:
+            dip_2_raw = max(ma5 if ma5 > 0 else 0.0, close * 0.97)
+
+        # 3차 보수적 마지노선 눌림목 (피보나치 0.618 되돌림 / 원칙 손절 직전 방어선)
+        if wave_height / max(1.0, close) >= 0.02:
+            dip_3_raw = wave_high - (wave_height * 0.618)
+        else:
+            dip_3_raw = max(sl_price, close * 0.95)
+
+        # 호가 단위 정규화 함수
+        def _round_price(p: float) -> float:
+            if p >= 500000:
+                return round(p / 1000.0) * 1000.0
+            elif p >= 100000:
+                return round(p / 500.0) * 500.0
+            elif p >= 50000:
+                return round(p / 100.0) * 1000.0 / 10.0 if False else round(p / 100.0) * 100.0
+            elif p >= 10000:
+                return round(p / 50.0) * 50.0
+            elif p >= 1000:
+                return round(p / 10.0) * 10.0
+            else:
+                return max(1.0, round(p))
+
+        dip_1 = _round_price(dip_1_raw)
+        dip_2 = _round_price(dip_2_raw)
+        dip_3 = _round_price(dip_3_raw)
+
+        # 엄격한 하향 계층 보정 (현재가 >= dip_1 > dip_2 > dip_3 > sl_dip_price)
+        if dip_1 >= close and close > 1000:
+            dip_1 = _round_price(close * 0.99)
+        if dip_2 >= dip_1:
+            dip_2 = _round_price(dip_1 * 0.985)
+        if dip_3 >= dip_2:
+            dip_3 = _round_price(dip_2 * 0.985)
+
+        sl_dip_price = _round_price(dip_3 * 0.99)
+
+        # 권장 매수 밴드
+        buy_band_min = dip_2
+        buy_band_max = dip_1
+        avg_entry = (buy_band_min + buy_band_max) / 2.0
+
+        dip_1_pct = ((dip_1 - close) / close * 100.0) if close > 0 else 0.0
+        dip_2_pct = ((dip_2 - close) / close * 100.0) if close > 0 else 0.0
+        dip_3_pct = ((dip_3 - close) / close * 100.0) if close > 0 else 0.0
+        loss_dip_pct = max(0.5, ((avg_entry - sl_dip_price) / avg_entry * 100.0))
+        gain_dip_pct = max(1.0, ((tp_price - avg_entry) / avg_entry * 100.0))
+        rr_dip = gain_dip_pct / loss_dip_pct
+
+        dip_direct = (
+            f"**{name}의 권장 진입 눌림목 구간은 {buy_band_min:,.0f}원 ~ {buy_band_max:,.0f}원(현재가 대비 {dip_2_pct:+.1f}% ~ {dip_1_pct:+.1f}%)입니다.** "
+            f"1차 공격적 눌림선({dip_1:,.0f}원)에서 비중 50%, 2차 황금 지지선({dip_2:,.0f}원)에서 비중 50%를 분할 매수하여 평단가(약 {avg_entry:,.0f}원)를 확보하십시오. "
+            f"3차 마지노선({dip_3:,.0f}원, 손절가 {sl_dip_price:,.0f}원) 이탈 시에는 즉시 손절로 대응하십시오."
+        )
+        ans = f"""> **[수석 애널리스트 핵심 직답]**: {dip_direct}
+
+### **{name} ({code}) 진입 최적화 눌림목 구간 정밀 퀀트 산출**
+
+- **질문 분석**: `{q_clean}`
+- **퀀트 산출 결과값 (권장 눌림목 밴드)**: **{buy_band_min:,.0f}원 ~ {buy_band_max:,.0f}원 (현재가 대비 {dip_2_pct:+.1f}% ~ {dip_1_pct:+.1f}%)**
+  - **1차 공격적 눌림선 (38.2% 되돌림 / 시초가 지지)**: **{dip_1:,.0f}원** ({dip_1_pct:+.1f}%, 비중 50% 1차 분할)
+  - **2차 정석 황금 지지선 (50.0% 하프 되돌림 / 5일선·피벗 지지)**: **{dip_2:,.0f}원** ({dip_2_pct:+.1f}%, 비중 50% 2차 분할)
+  - **3차 최종 마지노선 (61.8% 되돌림 / 원칙 손절 방어선)**: **{dip_3:,.0f}원** ({dip_3_pct:+.1f}%, 이탈 시 추세 훼손)
+  - **눌림목 평단 기준 손익비 (Risk/Reward)**: **{rr_dip:.2f} : 1** (기대수익 **+{gain_dip_pct:.1f}%** vs 허용손실 **-{loss_dip_pct:.1f}%**)
+
+**1. 3단계 눌림목 지지 레벨 상세 해부**
+- **1차 얕은 눌림목 ({dip_1:,.0f}원)**: 당일 상승 파동의 38.2% 피보나치 되돌림 구간입니다. 거래량이 강하게 폭발한 주도주는 1차 지지선만 터치하고 바로 n자형 2차 파동으로 직행하는 경우가 많으므로, 배정 비중의 50%를 선진입합니다.
+- **2차 황금 눌림목 ({dip_2:,.0f}원)**: 당일 파동의 중심값(50% 하프 되돌림)이자 단기 이평선(5일선 **{ma5:,.0f}원**) 및 피벗 중심선이 위치한 가장 이상적인 반등 타점입니다. 1차 진입 후 호가가 밀릴 때 침착하게 2차 물량을 실어 평균단가를 낮춥니다.
+- **3차 마지노선 ({dip_3:,.0f}원)**: 당일 상승 에너지의 61.8%가 반납되는 임계 구간입니다. 이 가격대를 깨고 내려갈 경우 단순 눌림목이 아닌 '당일 고점 차익 매물 폭탄(상투)'으로 전환되므로, 원칙 손절선(**{sl_dip_price:,.0f}원**) 이탈 시 미련 없이 전량 매도해야 합니다.
+
+**2. 실전 분할 매매 실행 지침**
+- **진입 요령**: 현재가(**{close:,.0f}원**, 당일 {change_pct:+.2f}%)에서 섣부른 추격매수 대신, 주가가 1차 눌림가(**{dip_1:,.0f}원**) 이하로 진입할 때 1차 매수, 2차 황금 지지선(**{dip_2:,.0f}원**) 부근에서 2차 분할 매수하여 평균단가를 **약 {avg_entry:,.0f}원**으로 맞추십시오.
+- **목표 익절**: 눌림목 지지 후 2차 상승 파동 발생 시 당일 고가권(**{resist_1:,.0f}원**) 및 1차 알고리즘 목표가 **{tp_price:,.0f}원 (+{tp_pct:.1f}%)**에서 비중 50%를 분할 익절하고 잔여 물량은 트레일링 스탑으로 수익을 극대화하십시오.
+- **원칙 손절**: 3차 마지노선이자 손절 기준가인 **{sl_dip_price:,.0f}원**을 하향 이탈할 경우 추가 급락을 원천 차단하기 위해 기계적으로 손절 처리하십시오.
+"""
+
+    # 4. 지금 사도 되나요? / 진입 가능 여부 / 추격매수 진단
     elif any(k in q_lower for k in ["사도", "진입", "매수", "추격", "타이밍", "신규", "들어가", "살까", "사볼까", "지금 사"]):
         if "장전" in strategy or "시초가" in strategy:
             risk_badge = " [우수: 장전 시초가 공략 후보]"
