@@ -5112,42 +5112,64 @@ def render_unified_verification_and_tuning_section():
     best_props = meta_opt["best_proposals"]
 
     # Master Action Header: One Button for Both Verification and Application
-    m_hdr_c1, m_hdr_c2 = st.columns([3.3, 1.7], vertical_alignment="center")
+    m_hdr_c1, m_hdr_c2 = st.columns([3.2, 1.8], vertical_alignment="center")
     with m_hdr_c1:
-        st.markdown('<div class="office-heading" style="font-size:1.05rem; font-weight:700; color:#0F172A; margin:0;">[통합 성과 검증 & AI 최적화 센터]</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div style="display:flex; flex-direction:column; justify-content:center; min-height:42px;">'
+            '<div class="office-heading" style="font-size:1.05rem; font-weight:700; color:#0F172A; margin:0; line-height:1.3;">[통합 성과 검증 & AI 최적화 센터]</div>'
+            '<div style="font-size:0.75rem; color:#64748B; margin-top:3px; line-height:1.3;">다주기 실거래 검증 및 최적화 파라미터 1번 스크리너 즉시 반영</div>'
+            '</div>',
+            unsafe_allow_html=True
+        )
     with m_hdr_c2:
         btn_ph = st.empty()
         if btn_ph.button("검증&최적화", type="primary", use_container_width=True, key="btn_run_all_in_one_master"):
-            def _render_btn_pct(pct_str: str):
+            def _render_btn_pct(pct: int):
+                p_val = max(0, min(100, pct))
                 btn_ph.markdown(
                     f'''
-                    <div style="width:100%; display:flex;">
+                    <div style="width:100%; display:flex; height:38px; align-items:center;">
                         <button disabled style="
                             width: 100%;
+                            height: 38px;
                             background: #2563EB;
                             color: #FFFFFF;
-                            padding: 0.55rem 1rem;
-                            border-radius: 0.5rem;
+                            padding: 0 1rem;
+                            border-radius: 6px;
                             border: none;
                             font-weight: 700;
-                            font-size: 0.95rem;
+                            font-size: 0.92rem;
                             cursor: wait;
                             opacity: 0.95;
                             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
                             text-align: center;
-                        ">{pct_str}</button>
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            margin: 0;
+                        ">검증&최적화({p_val}%)</button>
                     </div>
                     ''',
                     unsafe_allow_html=True
                 )
-            _render_btn_pct("검증&최적화(0%)")
-            time.sleep(0.35)
+
+            def _step_progress(start_p: int, end_p: int, step_delay: float = 0.02):
+                step = 1 if end_p >= start_p else -1
+                for p in range(start_p, end_p + step, step):
+                    _render_btn_pct(p)
+                    time.sleep(step_delay)
+
+            # 1. 0% -> 20%: 미정산 체결 내역 정산
+            _render_btn_pct(0)
+            _step_progress(0, 20, step_delay=0.015)
             settle_pending_predictions()
-            _render_btn_pct("검증&최적화(35%)")
-            time.sleep(0.35)
+
+            # 2. 20% -> 60%: 다주기(전일·주간·1개월) 실거래 성과 검증
+            _step_progress(20, 45, step_delay=0.015)
             run_weekly_batch_verification(limit_days=5, force_refresh=False)
-            _render_btn_pct("검증&최적화(75%)")
-            time.sleep(0.35)
+            _step_progress(45, 65, step_delay=0.015)
+
+            # 3. 65% -> 90%: 최적화 파라미터 산출 및 스크리너 적용 준비
             _get_cached_meta_opt.clear()
             _get_cached_decay_info.clear()
             _get_cached_weekly_res.clear()
@@ -5158,10 +5180,16 @@ def render_unified_verification_and_tuning_section():
             st.session_state["last_master_best_horizon"] = best_horizon_lbl
             st.session_state["last_master_best_ret"] = best_ret
             st.session_state["last_master_best_win"] = best_win
-            _render_btn_pct("검증&최적화(100%)")
-            time.sleep(0.40)
+            _step_progress(65, 90, step_delay=0.015)
+
+            # 4. 90% -> 100%: 최종 완료
+            _step_progress(90, 100, step_delay=0.02)
+            time.sleep(0.30)
             st.toast(f"검증&최적화 완료! AI 최고 추천 주기({best_horizon_lbl})의 최적 파라미터가 1번 스크리너에 즉시 적용되었습니다.")
             st.rerun()
+
+    # Clear boundary spacing so that header row never overlaps with metrics or banner below
+    st.markdown("<div style='height:14px; margin-bottom:12px; clear:both;'></div>", unsafe_allow_html=True)
 
     # 2. Status Notification Banner
     if st.session_state.get("tuning_applied_notification") or "last_master_run_at" in st.session_state:
