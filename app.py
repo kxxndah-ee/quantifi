@@ -232,19 +232,51 @@ st.markdown("""
         pointer-events: auto !important;
     }
 
-    /* 틀고정 레이아웃: 고정 헤더(상단바 42px + 탭바 40px = 82px) 아래로 본문 시작 */
-    .block-container {
-        padding-top: 86px !important;
-        padding-bottom: 1.0rem !important;
+    /* 틀고정 레이아웃: 전체 뷰포트 스크롤 제거 및 탭 패널 독립 분할 스크롤 */
+    html, body {
+        overflow: hidden !important;
+        height: 100% !important;
+    }
+    div[data-testid="stAppViewContainer"] {
+        overflow: hidden !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+    }
+    section[data-testid="stMain"],
+    section.stMain {
+        overflow: hidden !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        max-height: 100vh !important;
+        max-height: 100dvh !important;
+    }
+    .block-container,
+    div[data-testid="stMainBlockContainer"],
+    div.stMainBlockContainer {
+        height: 100vh !important;
+        height: 100dvh !important;
+        max-height: 100vh !important;
+        max-height: 100dvh !important;
+        overflow: hidden !important;
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
         padding-left: 1.5rem !important;
         padding-right: 1.5rem !important;
         max-width: 100% !important;
+        box-sizing: border-box !important;
     }
     div[data-testid="stElementContainer"]:has(style:only-child) {
         display: none !important;
         height: 0px !important;
         margin: 0px !important;
         padding: 0px !important;
+    }
+    div.stMainBlockContainer > div[data-testid="stVerticalBlock"],
+    div[data-testid="stMainBlockContainer"] > div[data-testid="stVerticalBlock"] {
+        height: 100% !important;
+        max-height: 100% !important;
+        overflow: hidden !important;
+        gap: 0px !important;
     }
     .stMainBlockContainer > .stVerticalBlock,
     .stVerticalBlock {
@@ -253,25 +285,22 @@ st.markdown("""
     div[data-testid="stVerticalBlock"] > div {
         gap: 0.35rem !important;
     }
-    /* 상단 내비게이션 바 틀고정: 스크롤해도 최상단(top: 0)에 영구 고정 */
+    /* 상단 내비게이션 바 틀고정: 상단 헤더 영역 정적 고정 */
     div[data-testid="stElementContainer"].st-key-top_nav_bar,
     .st-key-top_nav_bar {
-        position: fixed !important;
-        top: 0px !important;
-        left: 0px !important;
-        right: 0px !important;
+        position: static !important;
         width: 100% !important;
         height: 42px !important;
         min-height: 42px !important;
         max-height: 42px !important;
-        z-index: 9999 !important;
         background-color: #FFFFFF !important;
         margin: 0 !important;
-        padding: 2px 1.5rem 0px 1.5rem !important;
+        padding: 2px 0px 4px 0px !important;
         box-sizing: border-box !important;
         border-bottom: 1px solid #E2E8F0 !important;
         display: flex !important;
         align-items: center !important;
+        flex-shrink: 0 !important;
     }
     .st-key-top_nav_bar iframe {
         margin-bottom: 0px !important;
@@ -291,29 +320,6 @@ st.markdown("""
         margin: 0 !important;
         padding: 0 !important;
         line-height: 32px !important;
-    }
-    /* PC 데스크톱 사이드바 확장 시 상단 고정 헤더 위치 자동 보정 */
-    @media (min-width: 769px) {
-        div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"][aria-expanded="true"]) div[data-testid="stElementContainer"].st-key-top_nav_bar,
-        div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"][aria-expanded="true"]) .st-key-top_nav_bar,
-        div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"]:not([aria-expanded="false"])) div[data-testid="stElementContainer"].st-key-top_nav_bar,
-        div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"]:not([aria-expanded="false"])) .st-key-top_nav_bar {
-            left: 21rem !important;
-            width: calc(100% - 21rem) !important;
-        }
-
-        div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"][aria-expanded="true"]) div.st-key-main_tabs_header [data-baseweb="tab-list"],
-        div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"][aria-expanded="true"]) div.st-key-main_tabs_header [role="tablist"],
-        div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"]:not([aria-expanded="false"])) div.st-key-main_tabs_header [data-baseweb="tab-list"],
-        div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"]:not([aria-expanded="false"])) div.st-key-main_tabs_header [role="tablist"] {
-            left: 21rem !important;
-            width: calc(100% - 21rem) !important;
-        }
-
-        div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"][aria-expanded="true"]) .block-container,
-        div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"]:not([aria-expanded="false"])) .block-container {
-            padding-top: 86px !important;
-        }
     }
 
     /* PC 데스크톱: 시간 박스와 동기화 버튼을 6px 간격으로 나란히 밀착 배치 */
@@ -629,30 +635,42 @@ st.markdown("""
         margin-top: 2px !important;
         margin-bottom: 3px !important;
     }
-    /* 틀고정 (Freeze Panes): 1~4번 탭 메뉴 바 상단 바 바로 아래(top: 42px)에 영구 고정 */
-    div.st-key-main_tabs_header,
+    /* 틀고정 (Freeze Panes): 1~4번 탭 메뉴 바 및 탭 패널 분할 스크롤 */
+    div[data-testid="stElementContainer"].st-key-main_tabs_header,
+    .st-key-main_tabs_header {
+        position: static !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        flex: 1 1 auto !important;
+        height: calc(100vh - 42px) !important;
+        height: calc(100dvh - 42px) !important;
+        max-height: calc(100vh - 42px) !important;
+        max-height: calc(100dvh - 42px) !important;
+        overflow: hidden !important;
+    }
     div.st-key-main_tabs_header > div[data-testid="stTabs"],
     div.st-key-main_tabs_header .stTabs {
-        margin-top: 0px !important;
-        margin-bottom: 0px !important;
-        clear: both !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
     div.st-key-main_tabs_header [data-baseweb="tab-list"],
     div.st-key-main_tabs_header [role="tablist"],
     div[data-testid="stTabs"]:has(button[id*="1."]) [data-baseweb="tab-list"],
     div[data-testid="stTabs"]:has(button[id*="1."]) [role="tablist"] {
-        position: fixed !important;
-        top: 42px !important;
-        left: 0px !important;
-        right: 0px !important;
+        position: static !important;
         width: 100% !important;
         height: 40px !important;
         min-height: 40px !important;
         max-height: 40px !important;
-        z-index: 9998 !important;
         background-color: #FFFFFF !important;
         gap: 16px !important;
-        padding: 0px 1.5rem !important;
+        padding: 0px 4px !important;
         margin: 0px !important;
         border: none !important;
         border-bottom: 2px solid #E2E8F0 !important;
@@ -661,6 +679,69 @@ st.markdown("""
         flex-wrap: nowrap !important;
         align-items: flex-end !important;
         box-sizing: border-box !important;
+        flex-shrink: 0 !important;
+    }
+    /* 탭 패널: 메뉴 라인 아래로만 스크롤이 발생하도록 독립 스크롤 컨테이너 지정 */
+    div.st-key-main_tabs_header div[data-testid="stTabPanel"],
+    div.st-key-main_tabs_header div[role="tabpanel"],
+    div[data-testid="stTabs"]:has(button[id*="1."]) div[data-testid="stTabPanel"],
+    div[data-testid="stTabs"]:has(button[id*="1."]) div[role="tabpanel"] {
+        flex: 1 1 auto !important;
+        height: calc(100vh - 82px) !important;
+        height: calc(100dvh - 82px) !important;
+        max-height: calc(100vh - 82px) !important;
+        max-height: calc(100dvh - 82px) !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        padding-top: 8px !important;
+        padding-bottom: 3rem !important;
+        padding-right: 4px !important;
+        box-sizing: border-box !important;
+    }
+    /* 탭 패널 스크롤바 커스텀 */
+    div.st-key-main_tabs_header div[data-testid="stTabPanel"]::-webkit-scrollbar,
+    div[data-testid="stTabs"]:has(button[id*="1."]) div[data-testid="stTabPanel"]::-webkit-scrollbar {
+        width: 6px !important;
+    }
+    div.st-key-main_tabs_header div[data-testid="stTabPanel"]::-webkit-scrollbar-track,
+    div[data-testid="stTabs"]:has(button[id*="1."]) div[data-testid="stTabPanel"]::-webkit-scrollbar-track {
+        background: transparent !important;
+    }
+    div.st-key-main_tabs_header div[data-testid="stTabPanel"]::-webkit-scrollbar-thumb,
+    div[data-testid="stTabs"]:has(button[id*="1."]) div[data-testid="stTabPanel"]::-webkit-scrollbar-thumb {
+        background: #CBD5E1 !important;
+        border-radius: 3px !important;
+    }
+    div.st-key-main_tabs_header div[data-testid="stTabPanel"]::-webkit-scrollbar-thumb:hover,
+    div[data-testid="stTabs"]:has(button[id*="1."]) div[data-testid="stTabPanel"]::-webkit-scrollbar-thumb:hover {
+        background: #94A3B8 !important;
+    }
+    /* 익스팬더 내부 서브 탭 초기화: 고정 높이 해제 및 정상 인라인 흐름 유지 */
+    div[data-testid="stExpander"] div[data-testid="stTabs"] {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+    div[data-testid="stExpander"] [data-baseweb="tab-list"],
+    div[data-testid="stExpander"] [role="tablist"] {
+        position: static !important;
+        height: 36px !important;
+        min-height: 36px !important;
+        max-height: 36px !important;
+        border-bottom: 1px solid #E2E8F0 !important;
+        background: transparent !important;
+        padding: 0 !important;
+        gap: 8px !important;
+    }
+    div[data-testid="stExpander"] div[data-testid="stTabPanel"],
+    div[data-testid="stExpander"] div[role="tabpanel"] {
+        height: auto !important;
+        max-height: none !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+        padding-top: 10px !important;
+        padding-bottom: 10px !important;
     }
     /* Expander 독립 배치: 인접 박스 간격 50% 축소 최적화 */
     div[data-testid="stExpander"] {
@@ -1180,9 +1261,11 @@ st.markdown("""
 
     /* Mobile Responsive Optimizations (PC/Desktop layout is strictly preserved) */
     @media (max-width: 768px) {
-        .block-container {
-            padding-top: 132px !important;
-            padding-bottom: 0.8rem !important;
+        .block-container,
+        div[data-testid="stMainBlockContainer"],
+        div.stMainBlockContainer {
+            padding-top: 0px !important;
+            padding-bottom: 0px !important;
             padding-left: 0.5rem !important;
             padding-right: 0.5rem !important;
         }
@@ -1190,15 +1273,11 @@ st.markdown("""
         /* Top Nav Bar Mobile: Row 1 = Logo, Row 2 = 일시 (Clock), Row 3 = 동기화 버튼 */
         div[data-testid="stElementContainer"].st-key-top_nav_bar,
         .st-key-top_nav_bar {
-            position: fixed !important;
-            top: 0px !important;
-            left: 0px !important;
-            right: 0px !important;
+            position: static !important;
             width: 100% !important;
             height: 92px !important;
             min-height: 92px !important;
             max-height: 92px !important;
-            z-index: 9999 !important;
             background-color: #FFFFFF !important;
             margin: 0 !important;
             padding: 2px 0.5rem 0px 0.5rem !important;
@@ -1206,6 +1285,7 @@ st.markdown("""
             display: flex !important;
             flex-direction: column !important;
             box-sizing: border-box !important;
+            flex-shrink: 0 !important;
         }
         .st-key-top_nav_bar [data-testid="stHorizontalBlock"],
         div[data-testid="stHorizontalBlock"]:has(.st-key-btn_top_time_sync) {
@@ -1310,8 +1390,16 @@ st.markdown("""
             text-align: center !important;
         }
 
-        /* Mobile Tabs: 고정 헤더 아래(top: 92px)에 고정 */
-        div.st-key-main_tabs_header,
+        /* Mobile Tabs: 고정 헤더 아래 정적 흐름 */
+        div[data-testid="stElementContainer"].st-key-main_tabs_header,
+        .st-key-main_tabs_header {
+            margin: 0 !important;
+            padding: 0 !important;
+            height: calc(100vh - 92px) !important;
+            height: calc(100dvh - 92px) !important;
+            max-height: calc(100vh - 92px) !important;
+            max-height: calc(100dvh - 92px) !important;
+        }
         div.st-key-main_tabs_header > div[data-testid="stTabs"] {
             margin: 0 !important;
             padding: 0 !important;
@@ -1320,15 +1408,11 @@ st.markdown("""
         div.st-key-main_tabs_header [role="tablist"],
         div[data-testid="stTabs"]:has(button[id*="1."]) [data-baseweb="tab-list"],
         div[data-testid="stTabs"]:has(button[id*="1."]) [role="tablist"] {
-            position: fixed !important;
-            top: 92px !important;
-            left: 0px !important;
-            right: 0px !important;
+            position: static !important;
             width: 100% !important;
             height: 36px !important;
             min-height: 36px !important;
             max-height: 36px !important;
-            z-index: 9998 !important;
             background-color: #FFFFFF !important;
             gap: 8px !important;
             padding: 0px 0.5rem !important;
@@ -1340,6 +1424,21 @@ st.markdown("""
             overflow-x: auto !important;
             -webkit-overflow-scrolling: touch !important;
             scrollbar-width: none !important;
+            flex-shrink: 0 !important;
+        }
+        /* Mobile Tab Panel */
+        div.st-key-main_tabs_header div[data-testid="stTabPanel"],
+        div.st-key-main_tabs_header div[role="tabpanel"],
+        div[data-testid="stTabs"]:has(button[id*="1."]) div[data-testid="stTabPanel"],
+        div[data-testid="stTabs"]:has(button[id*="1."]) div[role="tabpanel"] {
+            height: calc(100vh - 128px) !important;
+            height: calc(100dvh - 128px) !important;
+            max-height: calc(100vh - 128px) !important;
+            max-height: calc(100dvh - 128px) !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            padding-top: 6px !important;
+            padding-bottom: 2rem !important;
         }
         div[data-testid="stTabs"] [role="tablist"]::-webkit-scrollbar,
         .stTabs [role="tablist"]::-webkit-scrollbar {
