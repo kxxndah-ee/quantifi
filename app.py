@@ -219,9 +219,22 @@ if "pending_tuning_updates" in st.session_state:
 # Custom CSS styling for badges, cards, and Korean fonts (Office Stealth Mode)
 st.markdown("""
 <style>
+    /* Streamlit Default Header: 투명화하여 고정 내비게이션 바를 가리지 않도록 처리 */
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+        height: 0px !important;
+        min-height: 0px !important;
+        padding: 0 !important;
+        pointer-events: none !important;
+        z-index: 1000 !important;
+    }
+    header[data-testid="stHeader"] [data-testid="stToolbar"] {
+        pointer-events: auto !important;
+    }
+
     /* Clean compact layout without wasted viewport padding, ensuring top tabs are clearly visible below Streamlit header */
     .block-container {
-        padding-top: 4.2rem !important;
+        padding-top: 0.5rem !important;
         padding-bottom: 1.0rem !important;
         padding-left: 1.5rem !important;
         padding-right: 1.5rem !important;
@@ -240,16 +253,24 @@ st.markdown("""
     div[data-testid="stVerticalBlock"] > div {
         gap: 0.35rem !important;
     }
+    /* 상단 내비게이션 바 틀고정: 스크롤 시 최상단(top: 0)에 완벽 고정 */
+    div[data-testid="stElementContainer"]:has(.st-key-top_nav_bar),
+    .st-key-top_nav_bar {
+        position: sticky !important;
+        top: 0px !important;
+        z-index: 999 !important;
+        background-color: #FFFFFF !important;
+    }
     .st-key-top_nav_bar {
         margin-top: 0px !important;
-        margin-bottom: 8px !important;
+        margin-bottom: 0px !important;
         padding-top: 2px !important;
         padding-bottom: 4px !important;
         min-height: 38px !important;
-        position: relative !important;
-        z-index: 20 !important;
+        height: 38px !important;
         clear: both !important;
         border-bottom: 1px solid #E2E8F0 !important;
+        box-sizing: border-box !important;
     }
     .st-key-top_nav_bar iframe {
         margin-bottom: 0px !important;
@@ -583,20 +604,23 @@ st.markdown("""
         margin-top: 2px !important;
         margin-bottom: 3px !important;
     }
-    /* 1~4번 탭 메뉴: 선택 시 언더바(Underbar) 내비게이션 스타일 */
+    /* 1~4번 탭 메뉴 틀고정: 상단 내비게이션 바 바로 아래(top: 38px)에 고정 */
     div[data-testid="stTabs"],
     .stTabs {
-        margin-top: 4px !important;
+        margin-top: 0px !important;
         margin-bottom: 8px !important;
         position: relative !important;
-        z-index: 10 !important;
         clear: both !important;
     }
-    div[data-testid="stTabs"] [role="tablist"],
+    div[data-testid="stTabs"] > div[role="tablist"],
+    div[data-testid="stTabs"] > div[data-baseweb="tab-list"],
     .stTabs [role="tablist"],
     div[data-baseweb="tab-list"] {
+        position: sticky !important;
+        top: 38px !important;
+        z-index: 998 !important;
+        background-color: #FFFFFF !important;
         gap: 16px !important;
-        background: transparent !important;
         padding: 0px 4px !important;
         border: none !important;
         border-bottom: 2px solid #E2E8F0 !important;
@@ -626,7 +650,7 @@ st.markdown("""
     div[data-baseweb="tab-border"] {
         display: none !important;
     }
-    /* 비활성 탭: 배경 없는 텍스트 버튼 (투명 배경) */
+    /* 비활성 탭: 흰색 배경 텍스트 버튼 (스크롤 시 내용 투과 방지) */
     div[data-testid="stTabs"] button[role="tab"],
     .stTabs button[role="tab"],
     button[data-baseweb="tab"] {
@@ -637,7 +661,7 @@ st.markdown("""
         padding: 8px 12px !important;
         height: 38px !important;
         min-height: 38px !important;
-        background: transparent !important;
+        background: #FFFFFF !important;
         color: #64748B !important;
         border: none !important;
         border-bottom: 3px solid transparent !important;
@@ -657,7 +681,7 @@ st.markdown("""
     div[data-testid="stTabs"] button[role="tab"]:hover,
     .stTabs button[role="tab"]:hover,
     button[data-baseweb="tab"]:hover {
-        background: transparent !important;
+        background: #F8FAFC !important;
         border-color: transparent !important;
         border-bottom: 3px solid #CBD5E1 !important;
         color: #1E293B !important;
@@ -669,7 +693,7 @@ st.markdown("""
     div[data-testid="stTabs"] button[role="tab"][data-selected],
     .stTabs button[role="tab"][data-selected],
     button[data-baseweb="tab"][aria-selected="true"] {
-        background: transparent !important;
+        background: #FFFFFF !important;
         color: #2563EB !important;
         font-weight: 700 !important;
         border: none !important;
@@ -1119,20 +1143,25 @@ st.markdown("""
     /* Mobile Responsive Optimizations (PC/Desktop layout is strictly preserved) */
     @media (max-width: 768px) {
         .block-container {
-            padding-top: 3.8rem !important;
+            padding-top: 0.5rem !important;
             padding-bottom: 0.8rem !important;
             padding-left: 0.5rem !important;
             padding-right: 0.5rem !important;
         }
 
         /* Top Nav Bar Mobile: Row 1 = Logo, Row 2 = 일시 (Clock), Row 3 = 동기화 버튼 (일시 바로 밑으로 배치) */
+        div[data-testid="stElementContainer"]:has(.st-key-top_nav_bar),
+        .st-key-top_nav_bar {
+            position: sticky !important;
+            top: 0px !important;
+            z-index: 999 !important;
+            background-color: #FFFFFF !important;
+        }
         .st-key-top_nav_bar {
             margin-top: 0px !important;
-            margin-bottom: 8px !important;
+            margin-bottom: 0px !important;
             padding-top: 0px !important;
             padding-bottom: 4px !important;
-            position: relative !important;
-            z-index: 20 !important;
             clear: both !important;
             border-bottom: 1px solid #E2E8F0 !important;
         }
@@ -1242,18 +1271,21 @@ st.markdown("""
         /* Mobile Tabs: Positioned cleanly below clock/sync row without overlap */
         div[data-testid="stTabs"],
         .stTabs {
-            margin-top: 4px !important;
+            margin-top: 0px !important;
             margin-bottom: 6px !important;
             position: relative !important;
-            z-index: 10 !important;
             clear: both !important;
         }
-        div[data-testid="stTabs"] [role="tablist"],
+        div[data-testid="stTabs"] > div[role="tablist"],
+        div[data-testid="stTabs"] > div[data-baseweb="tab-list"],
         .stTabs [role="tablist"],
         div[data-baseweb="tab-list"] {
+            position: sticky !important;
+            top: 92px !important;
+            z-index: 998 !important;
+            background-color: #FFFFFF !important;
             gap: 8px !important;
             padding: 0px 2px !important;
-            background: transparent !important;
             border: none !important;
             border-bottom: 2px solid #E2E8F0 !important;
             border-radius: 0px !important;
@@ -1274,7 +1306,7 @@ st.markdown("""
             padding: 6px 10px !important;
             height: 34px !important;
             min-height: 34px !important;
-            background: transparent !important;
+            background: #FFFFFF !important;
             color: #64748B !important;
             border: none !important;
             border-bottom: 3px solid transparent !important;
@@ -1287,7 +1319,7 @@ st.markdown("""
         div[data-testid="stTabs"] button[role="tab"][aria-selected="true"],
         .stTabs button[role="tab"][aria-selected="true"],
         button[data-baseweb="tab"][aria-selected="true"] {
-            background: transparent !important;
+            background: #FFFFFF !important;
             color: #2563EB !important;
             font-weight: 700 !important;
             border: none !important;
