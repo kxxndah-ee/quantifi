@@ -226,15 +226,15 @@ st.markdown("""
         min-height: 0px !important;
         padding: 0 !important;
         pointer-events: none !important;
-        z-index: 1000 !important;
+        z-index: 10001 !important;
     }
     header[data-testid="stHeader"] [data-testid="stToolbar"] {
         pointer-events: auto !important;
     }
 
-    /* Clean compact layout without wasted viewport padding, ensuring top tabs are clearly visible below Streamlit header */
+    /* 틀고정 레이아웃: 고정 헤더(상단바 42px + 탭바 40px = 82px) 아래로 본문 시작 */
     .block-container {
-        padding-top: 0.5rem !important;
+        padding-top: 86px !important;
         padding-bottom: 1.0rem !important;
         padding-left: 1.5rem !important;
         padding-right: 1.5rem !important;
@@ -253,24 +253,25 @@ st.markdown("""
     div[data-testid="stVerticalBlock"] > div {
         gap: 0.35rem !important;
     }
-    /* 상단 내비게이션 바 틀고정: 스크롤 시 최상단(top: 0)에 완벽 고정 */
-    div[data-testid="stElementContainer"]:has(.st-key-top_nav_bar),
+    /* 상단 내비게이션 바 틀고정: 스크롤해도 최상단(top: 0)에 영구 고정 */
+    div[data-testid="stElementContainer"].st-key-top_nav_bar,
     .st-key-top_nav_bar {
-        position: sticky !important;
+        position: fixed !important;
         top: 0px !important;
-        z-index: 999 !important;
+        left: 0px !important;
+        right: 0px !important;
+        width: 100% !important;
+        height: 42px !important;
+        min-height: 42px !important;
+        max-height: 42px !important;
+        z-index: 9999 !important;
         background-color: #FFFFFF !important;
-    }
-    .st-key-top_nav_bar {
-        margin-top: 0px !important;
-        margin-bottom: 0px !important;
-        padding-top: 2px !important;
-        padding-bottom: 4px !important;
-        min-height: 38px !important;
-        height: 38px !important;
-        clear: both !important;
-        border-bottom: 1px solid #E2E8F0 !important;
+        margin: 0 !important;
+        padding: 2px 1.5rem 0px 1.5rem !important;
         box-sizing: border-box !important;
+        border-bottom: 1px solid #E2E8F0 !important;
+        display: flex !important;
+        align-items: center !important;
     }
     .st-key-top_nav_bar iframe {
         margin-bottom: 0px !important;
@@ -291,6 +292,30 @@ st.markdown("""
         padding: 0 !important;
         line-height: 32px !important;
     }
+    /* PC 데스크톱 사이드바 확장 시 상단 고정 헤더 위치 자동 보정 */
+    @media (min-width: 769px) {
+        div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"][aria-expanded="true"]) div[data-testid="stElementContainer"].st-key-top_nav_bar,
+        div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"][aria-expanded="true"]) .st-key-top_nav_bar,
+        div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"]:not([aria-expanded="false"])) div[data-testid="stElementContainer"].st-key-top_nav_bar,
+        div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"]:not([aria-expanded="false"])) .st-key-top_nav_bar {
+            left: 21rem !important;
+            width: calc(100% - 21rem) !important;
+        }
+
+        div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"][aria-expanded="true"]) div.st-key-main_tabs_header [data-baseweb="tab-list"],
+        div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"][aria-expanded="true"]) div.st-key-main_tabs_header [role="tablist"],
+        div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"]:not([aria-expanded="false"])) div.st-key-main_tabs_header [data-baseweb="tab-list"],
+        div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"]:not([aria-expanded="false"])) div.st-key-main_tabs_header [role="tablist"] {
+            left: 21rem !important;
+            width: calc(100% - 21rem) !important;
+        }
+
+        div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"][aria-expanded="true"]) .block-container,
+        div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"]:not([aria-expanded="false"])) .block-container {
+            padding-top: 86px !important;
+        }
+    }
+
     /* PC 데스크톱: 시간 박스와 동기화 버튼을 6px 간격으로 나란히 밀착 배치 */
     @media (min-width: 769px) {
         .st-key-top_nav_bar [data-testid="stHorizontalBlock"],
@@ -604,31 +629,37 @@ st.markdown("""
         margin-top: 2px !important;
         margin-bottom: 3px !important;
     }
-    /* 1~4번 탭 메뉴 틀고정: 상단 내비게이션 바 바로 아래(top: 38px)에 고정 */
-    div[data-testid="stTabs"],
-    .stTabs {
+    /* 틀고정 (Freeze Panes): 1~4번 탭 메뉴 바 상단 바 바로 아래(top: 42px)에 영구 고정 */
+    div.st-key-main_tabs_header,
+    div.st-key-main_tabs_header > div[data-testid="stTabs"],
+    div.st-key-main_tabs_header .stTabs {
         margin-top: 0px !important;
-        margin-bottom: 8px !important;
-        position: relative !important;
+        margin-bottom: 0px !important;
         clear: both !important;
     }
-    div[data-testid="stTabs"] > div[role="tablist"],
-    div[data-testid="stTabs"] > div[data-baseweb="tab-list"],
-    .stTabs [role="tablist"],
-    div[data-baseweb="tab-list"] {
-        position: sticky !important;
-        top: 38px !important;
-        z-index: 998 !important;
+    div.st-key-main_tabs_header [data-baseweb="tab-list"],
+    div.st-key-main_tabs_header [role="tablist"],
+    div[data-testid="stTabs"]:has(button[id*="1."]) [data-baseweb="tab-list"],
+    div[data-testid="stTabs"]:has(button[id*="1."]) [role="tablist"] {
+        position: fixed !important;
+        top: 42px !important;
+        left: 0px !important;
+        right: 0px !important;
+        width: 100% !important;
+        height: 40px !important;
+        min-height: 40px !important;
+        max-height: 40px !important;
+        z-index: 9998 !important;
         background-color: #FFFFFF !important;
         gap: 16px !important;
-        padding: 0px 4px !important;
+        padding: 0px 1.5rem !important;
+        margin: 0px !important;
         border: none !important;
         border-bottom: 2px solid #E2E8F0 !important;
         border-radius: 0px !important;
         display: flex !important;
         flex-wrap: nowrap !important;
         align-items: flex-end !important;
-        min-height: 40px !important;
         box-sizing: border-box !important;
     }
     /* Expander 독립 배치: 인접 박스 간격 50% 축소 최적화 */
@@ -646,14 +677,17 @@ st.markdown("""
         padding-bottom: 0px !important;
     }
     /* 기본 인디케이터 초기화 */
-    div[data-baseweb="tab-highlight"],
-    div[data-baseweb="tab-border"] {
+    div.st-key-main_tabs_header [data-baseweb="tab-highlight"],
+    div.st-key-main_tabs_header [data-baseweb="tab-border"],
+    div[data-testid="stTabs"]:has(button[id*="1."]) [data-baseweb="tab-highlight"],
+    div[data-testid="stTabs"]:has(button[id*="1."]) [data-baseweb="tab-border"] {
         display: none !important;
     }
     /* 비활성 탭: 흰색 배경 텍스트 버튼 (스크롤 시 내용 투과 방지) */
-    div[data-testid="stTabs"] button[role="tab"],
-    .stTabs button[role="tab"],
-    button[data-baseweb="tab"] {
+    div.st-key-main_tabs_header button[role="tab"],
+    div.st-key-main_tabs_header button[data-baseweb="tab"],
+    div[data-testid="stTabs"]:has(button[id*="1."]) button[role="tab"],
+    div[data-testid="stTabs"]:has(button[id*="1."]) button[data-baseweb="tab"] {
         flex: 1 1 0px !important;
         text-align: center !important;
         font-size: 0.88rem !important;
@@ -671,16 +705,18 @@ st.markdown("""
         box-shadow: none !important;
         cursor: pointer !important;
     }
-    div[data-testid="stTabs"] button[role="tab"] *,
-    .stTabs button[role="tab"] *,
-    button[data-baseweb="tab"] * {
+    div.st-key-main_tabs_header button[role="tab"] *,
+    div.st-key-main_tabs_header button[data-baseweb="tab"] *,
+    div[data-testid="stTabs"]:has(button[id*="1."]) button[role="tab"] *,
+    div[data-testid="stTabs"]:has(button[id*="1."]) button[data-baseweb="tab"] * {
         color: inherit !important;
         font-weight: inherit !important;
     }
     /* 비활성 탭 호버 효과 */
-    div[data-testid="stTabs"] button[role="tab"]:hover,
-    .stTabs button[role="tab"]:hover,
-    button[data-baseweb="tab"]:hover {
+    div.st-key-main_tabs_header button[role="tab"]:hover,
+    div.st-key-main_tabs_header button[data-baseweb="tab"]:hover,
+    div[data-testid="stTabs"]:has(button[id*="1."]) button[role="tab"]:hover,
+    div[data-testid="stTabs"]:has(button[id*="1."]) button[data-baseweb="tab"]:hover {
         background: #F8FAFC !important;
         border-color: transparent !important;
         border-bottom: 3px solid #CBD5E1 !important;
@@ -688,11 +724,12 @@ st.markdown("""
         box-shadow: none !important;
     }
     /* 활성 탭: 선택 시 명확한 블루 텍스트 및 3px 언더바(Underbar) 표시 */
-    div[data-testid="stTabs"] button[role="tab"][aria-selected="true"],
-    .stTabs button[role="tab"][aria-selected="true"],
-    div[data-testid="stTabs"] button[role="tab"][data-selected],
-    .stTabs button[role="tab"][data-selected],
-    button[data-baseweb="tab"][aria-selected="true"] {
+    div.st-key-main_tabs_header button[role="tab"][aria-selected="true"],
+    div.st-key-main_tabs_header button[role="tab"][data-selected],
+    div.st-key-main_tabs_header button[data-baseweb="tab"][aria-selected="true"],
+    div[data-testid="stTabs"]:has(button[id*="1."]) button[role="tab"][aria-selected="true"],
+    div[data-testid="stTabs"]:has(button[id*="1."]) button[role="tab"][data-selected],
+    div[data-testid="stTabs"]:has(button[id*="1."]) button[data-baseweb="tab"][aria-selected="true"] {
         background: #FFFFFF !important;
         color: #2563EB !important;
         font-weight: 700 !important;
@@ -701,11 +738,12 @@ st.markdown("""
         margin-bottom: -2px !important;
         box-shadow: none !important;
     }
-    div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] *,
-    .stTabs button[role="tab"][aria-selected="true"] *,
-    div[data-testid="stTabs"] button[role="tab"][data-selected] *,
-    .stTabs button[role="tab"][data-selected] *,
-    button[data-baseweb="tab"][aria-selected="true"] * {
+    div.st-key-main_tabs_header button[role="tab"][aria-selected="true"] *,
+    div.st-key-main_tabs_header button[role="tab"][data-selected] *,
+    div.st-key-main_tabs_header button[data-baseweb="tab"][aria-selected="true"] *,
+    div[data-testid="stTabs"]:has(button[id*="1."]) button[role="tab"][aria-selected="true"] *,
+    div[data-testid="stTabs"]:has(button[id*="1."]) button[role="tab"][data-selected] *,
+    div[data-testid="stTabs"]:has(button[id*="1."]) button[data-baseweb="tab"][aria-selected="true"] * {
         color: #2563EB !important;
         font-weight: 700 !important;
     }
@@ -1143,27 +1181,31 @@ st.markdown("""
     /* Mobile Responsive Optimizations (PC/Desktop layout is strictly preserved) */
     @media (max-width: 768px) {
         .block-container {
-            padding-top: 0.5rem !important;
+            padding-top: 132px !important;
             padding-bottom: 0.8rem !important;
             padding-left: 0.5rem !important;
             padding-right: 0.5rem !important;
         }
 
-        /* Top Nav Bar Mobile: Row 1 = Logo, Row 2 = 일시 (Clock), Row 3 = 동기화 버튼 (일시 바로 밑으로 배치) */
-        div[data-testid="stElementContainer"]:has(.st-key-top_nav_bar),
+        /* Top Nav Bar Mobile: Row 1 = Logo, Row 2 = 일시 (Clock), Row 3 = 동기화 버튼 */
+        div[data-testid="stElementContainer"].st-key-top_nav_bar,
         .st-key-top_nav_bar {
-            position: sticky !important;
+            position: fixed !important;
             top: 0px !important;
-            z-index: 999 !important;
+            left: 0px !important;
+            right: 0px !important;
+            width: 100% !important;
+            height: 92px !important;
+            min-height: 92px !important;
+            max-height: 92px !important;
+            z-index: 9999 !important;
             background-color: #FFFFFF !important;
-        }
-        .st-key-top_nav_bar {
-            margin-top: 0px !important;
-            margin-bottom: 0px !important;
-            padding-top: 0px !important;
-            padding-bottom: 4px !important;
-            clear: both !important;
+            margin: 0 !important;
+            padding: 2px 0.5rem 0px 0.5rem !important;
             border-bottom: 1px solid #E2E8F0 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            box-sizing: border-box !important;
         }
         .st-key-top_nav_bar [data-testid="stHorizontalBlock"],
         div[data-testid="stHorizontalBlock"]:has(.st-key-btn_top_time_sync) {
@@ -1268,24 +1310,28 @@ st.markdown("""
             text-align: center !important;
         }
 
-        /* Mobile Tabs: Positioned cleanly below clock/sync row without overlap */
-        div[data-testid="stTabs"],
-        .stTabs {
-            margin-top: 0px !important;
-            margin-bottom: 6px !important;
-            position: relative !important;
-            clear: both !important;
+        /* Mobile Tabs: 고정 헤더 아래(top: 92px)에 고정 */
+        div.st-key-main_tabs_header,
+        div.st-key-main_tabs_header > div[data-testid="stTabs"] {
+            margin: 0 !important;
+            padding: 0 !important;
         }
-        div[data-testid="stTabs"] > div[role="tablist"],
-        div[data-testid="stTabs"] > div[data-baseweb="tab-list"],
-        .stTabs [role="tablist"],
-        div[data-baseweb="tab-list"] {
-            position: sticky !important;
+        div.st-key-main_tabs_header [data-baseweb="tab-list"],
+        div.st-key-main_tabs_header [role="tablist"],
+        div[data-testid="stTabs"]:has(button[id*="1."]) [data-baseweb="tab-list"],
+        div[data-testid="stTabs"]:has(button[id*="1."]) [role="tablist"] {
+            position: fixed !important;
             top: 92px !important;
-            z-index: 998 !important;
+            left: 0px !important;
+            right: 0px !important;
+            width: 100% !important;
+            height: 36px !important;
+            min-height: 36px !important;
+            max-height: 36px !important;
+            z-index: 9998 !important;
             background-color: #FFFFFF !important;
             gap: 8px !important;
-            padding: 0px 2px !important;
+            padding: 0px 0.5rem !important;
             border: none !important;
             border-bottom: 2px solid #E2E8F0 !important;
             border-radius: 0px !important;
@@ -3099,7 +3145,8 @@ _def_tab = st.session_state.get('main_active_tab_nav', main_tab_names[0])
 if _def_tab not in main_tab_names:
     _def_tab = main_tab_names[0]
 
-tab1, tab2, tab3, tab4 = st.tabs(main_tab_names, default=_def_tab)
+with st.container(key="main_tabs_header"):
+    tab1, tab2, tab3, tab4 = st.tabs(main_tab_names, default=_def_tab)
 
 
 # =========================================================
