@@ -232,10 +232,12 @@ st.markdown("""
         pointer-events: auto !important;
     }
 
-    /* 틀고정 레이아웃: 전체 뷰포트 스크롤 제거 및 탭 패널 독립 분할 스크롤 */
+    /* 틀고정 레이아웃: 전체 뷰포트 고정 및 탭 패널 분할 스크롤 */
     html, body {
         overflow: hidden !important;
         height: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
     div[data-testid="stAppViewContainer"] {
         overflow: hidden !important;
@@ -264,6 +266,8 @@ st.markdown("""
         padding-right: 1.5rem !important;
         max-width: 100% !important;
         box-sizing: border-box !important;
+        display: flex !important;
+        flex-direction: column !important;
     }
     div[data-testid="stElementContainer"]:has(style:only-child) {
         display: none !important;
@@ -276,6 +280,8 @@ st.markdown("""
         height: 100% !important;
         max-height: 100% !important;
         overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
         gap: 0px !important;
     }
     .stMainBlockContainer > .stVerticalBlock,
@@ -285,7 +291,7 @@ st.markdown("""
     div[data-testid="stVerticalBlock"] > div {
         gap: 0.35rem !important;
     }
-    /* 상단 내비게이션 바 틀고정: 상단 헤더 영역 정적 고정 */
+    /* 상단 내비게이션 바 틀고정: 상단 헤더 영역 42px 정적 고정 */
     div[data-testid="stElementContainer"].st-key-top_nav_bar,
     .st-key-top_nav_bar {
         position: static !important;
@@ -300,7 +306,7 @@ st.markdown("""
         border-bottom: 1px solid #E2E8F0 !important;
         display: flex !important;
         align-items: center !important;
-        flex-shrink: 0 !important;
+        flex: 0 0 42px !important;
     }
     .st-key-top_nav_bar iframe {
         margin-bottom: 0px !important;
@@ -643,14 +649,15 @@ st.markdown("""
         margin: 0 !important;
         padding: 0 !important;
         flex: 1 1 auto !important;
-        height: calc(100vh - 42px) !important;
-        height: calc(100dvh - 42px) !important;
-        max-height: calc(100vh - 42px) !important;
-        max-height: calc(100dvh - 42px) !important;
+        height: calc(100% - 42px) !important;
+        max-height: calc(100% - 42px) !important;
+        display: flex !important;
+        flex-direction: column !important;
         overflow: hidden !important;
     }
-    div.st-key-main_tabs_header > div[data-testid="stTabs"],
-    div.st-key-main_tabs_header .stTabs {
+    div.st-key-main_tabs_header div[data-testid="stTabs"],
+    div.st-key-main_tabs_header .stTabs,
+    div[data-testid="stTabs"] {
         height: 100% !important;
         max-height: 100% !important;
         display: flex !important;
@@ -658,90 +665,113 @@ st.markdown("""
         overflow: hidden !important;
         margin: 0 !important;
         padding: 0 !important;
+        flex: 1 1 auto !important;
     }
-    div.st-key-main_tabs_header [data-baseweb="tab-list"],
-    div.st-key-main_tabs_header [role="tablist"],
-    div[data-testid="stTabs"]:has(button[id*="1."]) [data-baseweb="tab-list"],
-    div[data-testid="stTabs"]:has(button[id*="1."]) [role="tablist"] {
+    div[data-testid="stTabs"] > div {
+        height: 100% !important;
+        max-height: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        flex: 1 1 auto !important;
+    }
+    /* 1~4번 메인 탭바: 가로 100%, 높이 40px, 하단에 2px 견고한 분할선 (#E2E8F0) */
+    div[data-testid="stTabs"] [role="tablist"],
+    div[data-testid="stTabs"] .react-aria-TabList,
+    div[data-testid="stTabs"] [data-baseweb="tab-list"] {
         position: static !important;
-        width: 100% !important;
+        flex: 0 0 40px !important;
         height: 40px !important;
         min-height: 40px !important;
         max-height: 40px !important;
+        width: 100% !important;
         background-color: #FFFFFF !important;
-        gap: 16px !important;
-        padding: 0px 4px !important;
-        margin: 0px !important;
         border: none !important;
         border-bottom: 2px solid #E2E8F0 !important;
-        border-radius: 0px !important;
-        display: flex !important;
-        flex-wrap: nowrap !important;
-        align-items: flex-end !important;
         box-sizing: border-box !important;
-        flex-shrink: 0 !important;
+        margin: 0 !important;
+        padding: 0 4px !important;
+        gap: 16px !important;
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: flex-end !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
     }
-    /* 탭 패널: 메뉴 라인 아래로만 스크롤이 발생하도록 독립 스크롤 컨테이너 지정 */
-    div.st-key-main_tabs_header div[data-testid="stTabPanel"],
-    div.st-key-main_tabs_header div[role="tabpanel"],
-    div[data-testid="stTabs"]:has(button[id*="1."]) div[data-testid="stTabPanel"],
-    div[data-testid="stTabs"]:has(button[id*="1."]) div[role="tabpanel"] {
+    /* 탭 패널: 메뉴 분할선 아래로만 독립 스크롤 생성 */
+    div[data-testid="stTabs"] [role="tabpanel"],
+    div[data-testid="stTabs"] .react-aria-TabPanel,
+    div[data-testid="stTabs"] div[data-testid="stTabPanel"],
+    div[role="tabpanel"][data-testid="stTabPanel"] {
         flex: 1 1 auto !important;
-        height: calc(100vh - 82px) !important;
-        height: calc(100dvh - 82px) !important;
-        max-height: calc(100vh - 82px) !important;
-        max-height: calc(100dvh - 82px) !important;
+        height: calc(100% - 40px) !important;
+        max-height: calc(100% - 40px) !important;
         overflow-y: auto !important;
         overflow-x: hidden !important;
         -webkit-overflow-scrolling: touch !important;
-        padding-top: 8px !important;
-        padding-bottom: 3rem !important;
-        padding-right: 4px !important;
+        padding-top: 10px !important;
+        padding-bottom: 3.5rem !important;
+        padding-right: 6px !important;
         box-sizing: border-box !important;
     }
     /* 탭 패널 스크롤바 커스텀 */
-    div.st-key-main_tabs_header div[data-testid="stTabPanel"]::-webkit-scrollbar,
-    div[data-testid="stTabs"]:has(button[id*="1."]) div[data-testid="stTabPanel"]::-webkit-scrollbar {
-        width: 6px !important;
+    div[data-testid="stTabs"] [role="tabpanel"]::-webkit-scrollbar,
+    div[data-testid="stTabPanel"]::-webkit-scrollbar {
+        width: 8px !important;
     }
-    div.st-key-main_tabs_header div[data-testid="stTabPanel"]::-webkit-scrollbar-track,
-    div[data-testid="stTabs"]:has(button[id*="1."]) div[data-testid="stTabPanel"]::-webkit-scrollbar-track {
-        background: transparent !important;
+    div[data-testid="stTabs"] [role="tabpanel"]::-webkit-scrollbar-track,
+    div[data-testid="stTabPanel"]::-webkit-scrollbar-track {
+        background: #F1F5F9 !important;
+        border-radius: 4px !important;
     }
-    div.st-key-main_tabs_header div[data-testid="stTabPanel"]::-webkit-scrollbar-thumb,
-    div[data-testid="stTabs"]:has(button[id*="1."]) div[data-testid="stTabPanel"]::-webkit-scrollbar-thumb {
-        background: #CBD5E1 !important;
-        border-radius: 3px !important;
-    }
-    div.st-key-main_tabs_header div[data-testid="stTabPanel"]::-webkit-scrollbar-thumb:hover,
-    div[data-testid="stTabs"]:has(button[id*="1."]) div[data-testid="stTabPanel"]::-webkit-scrollbar-thumb:hover {
+    div[data-testid="stTabs"] [role="tabpanel"]::-webkit-scrollbar-thumb,
+    div[data-testid="stTabPanel"]::-webkit-scrollbar-thumb {
         background: #94A3B8 !important;
+        border-radius: 4px !important;
+    }
+    div[data-testid="stTabs"] [role="tabpanel"]::-webkit-scrollbar-thumb:hover,
+    div[data-testid="stTabPanel"]::-webkit-scrollbar-thumb:hover {
+        background: #64748B !important;
     }
     /* 익스팬더 내부 서브 탭 초기화: 고정 높이 해제 및 정상 인라인 흐름 유지 */
-    div[data-testid="stExpander"] div[data-testid="stTabs"] {
+    div[data-testid="stExpander"] div[data-testid="stTabs"],
+    div[data-testid="stExpander"] div[data-testid="stTabs"] > div {
+        display: block !important;
         height: auto !important;
         max-height: none !important;
         overflow: visible !important;
+        flex: none !important;
     }
-    div[data-testid="stExpander"] [data-baseweb="tab-list"],
-    div[data-testid="stExpander"] [role="tablist"] {
-        position: static !important;
+    div[data-testid="stExpander"] [role="tablist"],
+    div[data-testid="stExpander"] .react-aria-TabList {
+        flex: none !important;
         height: 36px !important;
         min-height: 36px !important;
         max-height: 36px !important;
-        border-bottom: 1px solid #E2E8F0 !important;
+        border-bottom: 1px solid #CBD5E1 !important;
         background: transparent !important;
         padding: 0 !important;
         gap: 8px !important;
     }
-    div[data-testid="stExpander"] div[data-testid="stTabPanel"],
-    div[data-testid="stExpander"] div[role="tabpanel"] {
+    div[data-testid="stExpander"] [role="tab"],
+    div[data-testid="stExpander"] .react-aria-Tab {
+        height: 34px !important;
+        min-height: 34px !important;
+        font-size: 0.82rem !important;
+        padding: 4px 10px !important;
+    }
+    div[data-testid="stExpander"] [role="tabpanel"],
+    div[data-testid="stExpander"] .react-aria-TabPanel,
+    div[data-testid="stExpander"] div[data-testid="stTabPanel"] {
         height: auto !important;
         max-height: none !important;
         min-height: 0 !important;
         overflow: visible !important;
-        padding-top: 10px !important;
-        padding-bottom: 10px !important;
+        padding: 10px 0 !important;
+        flex: none !important;
     }
     /* Expander 독립 배치: 인접 박스 간격 50% 축소 최적화 */
     div[data-testid="stExpander"] {
@@ -758,17 +788,16 @@ st.markdown("""
         padding-bottom: 0px !important;
     }
     /* 기본 인디케이터 초기화 */
-    div.st-key-main_tabs_header [data-baseweb="tab-highlight"],
-    div.st-key-main_tabs_header [data-baseweb="tab-border"],
-    div[data-testid="stTabs"]:has(button[id*="1."]) [data-baseweb="tab-highlight"],
-    div[data-testid="stTabs"]:has(button[id*="1."]) [data-baseweb="tab-border"] {
+    [role="tablist"] [data-baseweb="tab-highlight"],
+    [role="tablist"] [data-baseweb="tab-border"] {
         display: none !important;
     }
-    /* 비활성 탭: 흰색 배경 텍스트 버튼 (스크롤 시 내용 투과 방지) */
-    div.st-key-main_tabs_header button[role="tab"],
-    div.st-key-main_tabs_header button[data-baseweb="tab"],
-    div[data-testid="stTabs"]:has(button[id*="1."]) button[role="tab"],
-    div[data-testid="stTabs"]:has(button[id*="1."]) button[data-baseweb="tab"] {
+    /* 비활성 탭: 흰색 배경 텍스트 버튼 */
+    [role="tablist"] [role="tab"],
+    [role="tablist"] .react-aria-Tab,
+    [role="tablist"] button[role="tab"],
+    [role="tablist"] [data-baseweb="tab"],
+    div[data-testid="stTab"] {
         flex: 1 1 0px !important;
         text-align: center !important;
         font-size: 0.88rem !important;
@@ -785,32 +814,35 @@ st.markdown("""
         transition: all 0.15s ease-in-out !important;
         box-shadow: none !important;
         cursor: pointer !important;
+        position: relative !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
-    div.st-key-main_tabs_header button[role="tab"] *,
-    div.st-key-main_tabs_header button[data-baseweb="tab"] *,
-    div[data-testid="stTabs"]:has(button[id*="1."]) button[role="tab"] *,
-    div[data-testid="stTabs"]:has(button[id*="1."]) button[data-baseweb="tab"] * {
+    [role="tablist"] [role="tab"] *,
+    [role="tablist"] .react-aria-Tab *,
+    [role="tablist"] button[role="tab"] *,
+    div[data-testid="stTab"] * {
         color: inherit !important;
         font-weight: inherit !important;
     }
     /* 비활성 탭 호버 효과 */
-    div.st-key-main_tabs_header button[role="tab"]:hover,
-    div.st-key-main_tabs_header button[data-baseweb="tab"]:hover,
-    div[data-testid="stTabs"]:has(button[id*="1."]) button[role="tab"]:hover,
-    div[data-testid="stTabs"]:has(button[id*="1."]) button[data-baseweb="tab"]:hover {
+    [role="tablist"] [role="tab"]:hover,
+    [role="tablist"] .react-aria-Tab:hover,
+    [role="tablist"] button[role="tab"]:hover,
+    div[data-testid="stTab"]:hover {
         background: #F8FAFC !important;
-        border-color: transparent !important;
         border-bottom: 3px solid #CBD5E1 !important;
         color: #1E293B !important;
         box-shadow: none !important;
     }
     /* 활성 탭: 선택 시 명확한 블루 텍스트 및 3px 언더바(Underbar) 표시 */
-    div.st-key-main_tabs_header button[role="tab"][aria-selected="true"],
-    div.st-key-main_tabs_header button[role="tab"][data-selected],
-    div.st-key-main_tabs_header button[data-baseweb="tab"][aria-selected="true"],
-    div[data-testid="stTabs"]:has(button[id*="1."]) button[role="tab"][aria-selected="true"],
-    div[data-testid="stTabs"]:has(button[id*="1."]) button[role="tab"][data-selected],
-    div[data-testid="stTabs"]:has(button[id*="1."]) button[data-baseweb="tab"][aria-selected="true"] {
+    [role="tablist"] [role="tab"][data-selected],
+    [role="tablist"] [role="tab"][aria-selected="true"],
+    [role="tablist"] .react-aria-Tab[data-selected],
+    [role="tablist"] button[role="tab"][aria-selected="true"],
+    [role="tablist"] [data-baseweb="tab"][aria-selected="true"],
+    div[data-testid="stTab"][data-selected] {
         background: #FFFFFF !important;
         color: #2563EB !important;
         font-weight: 700 !important;
@@ -819,14 +851,18 @@ st.markdown("""
         margin-bottom: -2px !important;
         box-shadow: none !important;
     }
-    div.st-key-main_tabs_header button[role="tab"][aria-selected="true"] *,
-    div.st-key-main_tabs_header button[role="tab"][data-selected] *,
-    div.st-key-main_tabs_header button[data-baseweb="tab"][aria-selected="true"] *,
-    div[data-testid="stTabs"]:has(button[id*="1."]) button[role="tab"][aria-selected="true"] *,
-    div[data-testid="stTabs"]:has(button[id*="1."]) button[role="tab"][data-selected] *,
-    div[data-testid="stTabs"]:has(button[id*="1."]) button[data-baseweb="tab"][aria-selected="true"] * {
+    [role="tablist"] [role="tab"][data-selected] *,
+    [role="tablist"] [role="tab"][aria-selected="true"] *,
+    [role="tablist"] .react-aria-Tab[data-selected] *,
+    [role="tablist"] button[role="tab"][aria-selected="true"] *,
+    [role="tablist"] [data-baseweb="tab"][aria-selected="true"] *,
+    div[data-testid="stTab"][data-selected] * {
         color: #2563EB !important;
         font-weight: 700 !important;
+    }
+    /* React Aria 내장 SelectionIndicator 숨김 (자체 3px border-bottom 언더바 사용) */
+    [role="tab"] .react-aria-SelectionIndicator {
+        display: none !important;
     }
     .stMarkdown table {
         font-size: 0.78rem !important;
@@ -1390,29 +1426,24 @@ st.markdown("""
             text-align: center !important;
         }
 
-        /* Mobile Tabs: 고정 헤더 아래 정적 흐름 */
+        /* Mobile Tabs Container: flex fill */
         div[data-testid="stElementContainer"].st-key-main_tabs_header,
         .st-key-main_tabs_header {
             margin: 0 !important;
             padding: 0 !important;
-            height: calc(100vh - 92px) !important;
-            height: calc(100dvh - 92px) !important;
-            max-height: calc(100vh - 92px) !important;
-            max-height: calc(100dvh - 92px) !important;
+            flex: 1 1 auto !important;
+            height: calc(100% - 92px) !important;
+            max-height: calc(100% - 92px) !important;
         }
-        div.st-key-main_tabs_header > div[data-testid="stTabs"] {
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-        div.st-key-main_tabs_header [data-baseweb="tab-list"],
-        div.st-key-main_tabs_header [role="tablist"],
-        div[data-testid="stTabs"]:has(button[id*="1."]) [data-baseweb="tab-list"],
-        div[data-testid="stTabs"]:has(button[id*="1."]) [role="tablist"] {
+        div[data-testid="stTabs"] [role="tablist"],
+        div[data-testid="stTabs"] .react-aria-TabList,
+        div[data-testid="stTabs"] [data-baseweb="tab-list"] {
             position: static !important;
-            width: 100% !important;
+            flex: 0 0 36px !important;
             height: 36px !important;
             min-height: 36px !important;
             max-height: 36px !important;
+            width: 100% !important;
             background-color: #FFFFFF !important;
             gap: 8px !important;
             padding: 0px 0.5rem !important;
@@ -1424,52 +1455,35 @@ st.markdown("""
             overflow-x: auto !important;
             -webkit-overflow-scrolling: touch !important;
             scrollbar-width: none !important;
-            flex-shrink: 0 !important;
         }
-        /* Mobile Tab Panel */
-        div.st-key-main_tabs_header div[data-testid="stTabPanel"],
-        div.st-key-main_tabs_header div[role="tabpanel"],
-        div[data-testid="stTabs"]:has(button[id*="1."]) div[data-testid="stTabPanel"],
-        div[data-testid="stTabs"]:has(button[id*="1."]) div[role="tabpanel"] {
-            height: calc(100vh - 128px) !important;
-            height: calc(100dvh - 128px) !important;
-            max-height: calc(100vh - 128px) !important;
-            max-height: calc(100dvh - 128px) !important;
-            overflow-y: auto !important;
-            overflow-x: hidden !important;
-            padding-top: 6px !important;
-            padding-bottom: 2rem !important;
-        }
-        div[data-testid="stTabs"] [role="tablist"]::-webkit-scrollbar,
-        .stTabs [role="tablist"]::-webkit-scrollbar {
+        div[data-testid="stTabs"] [role="tablist"]::-webkit-scrollbar {
             display: none !important;
         }
-        div[data-testid="stTabs"] button[role="tab"],
-        .stTabs button[role="tab"],
-        button[data-baseweb="tab"] {
+        [role="tablist"] [role="tab"],
+        [role="tablist"] .react-aria-Tab,
+        [role="tablist"] button[role="tab"],
+        [role="tablist"] [data-baseweb="tab"] {
             font-size: 0.76rem !important;
             padding: 6px 10px !important;
             height: 34px !important;
             min-height: 34px !important;
-            background: #FFFFFF !important;
-            color: #64748B !important;
-            border: none !important;
-            border-bottom: 3px solid transparent !important;
-            margin-bottom: -2px !important;
-            border-radius: 0px !important;
             white-space: nowrap !important;
             flex: 0 0 auto !important;
             box-shadow: none !important;
         }
-        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"],
-        .stTabs button[role="tab"][aria-selected="true"],
-        button[data-baseweb="tab"][aria-selected="true"] {
-            background: #FFFFFF !important;
-            color: #2563EB !important;
-            font-weight: 700 !important;
-            border: none !important;
-            border-bottom: 3px solid #2563EB !important;
-            box-shadow: none !important;
+        /* Mobile Tab Panel */
+        div[data-testid="stTabs"] [role="tabpanel"],
+        div[data-testid="stTabs"] .react-aria-TabPanel,
+        div[data-testid="stTabs"] div[data-testid="stTabPanel"],
+        div[role="tabpanel"][data-testid="stTabPanel"] {
+            flex: 1 1 auto !important;
+            height: calc(100% - 36px) !important;
+            max-height: calc(100% - 36px) !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            padding-top: 6px !important;
+            padding-bottom: 2rem !important;
+            padding-right: 4px !important;
         }
 
         /* Global Regime & Reference Time: 모바일에서 기준시각을 글로벌 체제 박스 바로 아래로 명확히 배치 */
