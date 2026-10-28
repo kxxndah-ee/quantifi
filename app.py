@@ -659,7 +659,7 @@ st.markdown("""
         overflow: hidden !important;
     }
     .st-key-main_tabs_header > div[data-testid="stElementContainer"],
-    .st-key-main_tabs_header [data-testid="stElementContainer"] {
+    .st-key-main_tabs_header > div.element-container {
         flex: 1 1 auto !important;
         height: 100% !important;
         min-height: 0 !important;
@@ -727,6 +727,64 @@ st.markdown("""
         padding-bottom: 4rem !important;
         padding-right: 6px !important;
         box-sizing: border-box !important;
+    }
+
+    /* 탭 패널 내부 콘텐츠: 텍스트 짤림 방지 및 정상 블록 흐름 보장 */
+    [role="tabpanel"] div[data-testid="stElementContainer"],
+    [role="tabpanel"] .element-container,
+    div[data-testid="stTabPanel"] div[data-testid="stElementContainer"],
+    div[data-testid="stTabPanel"] .element-container {
+        flex: none !important;
+        height: auto !important;
+        min-height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        display: block !important;
+    }
+    [role="tabpanel"] div[data-testid="stMarkdownContainer"],
+    [role="tabpanel"] .stMarkdown,
+    [role="tabpanel"] div[data-testid="stMarkdownContainer"] p,
+    div[data-testid="stTabPanel"] div[data-testid="stMarkdownContainer"],
+    div[data-testid="stTabPanel"] .stMarkdown,
+    div[data-testid="stTabPanel"] div[data-testid="stMarkdownContainer"] p {
+        overflow: visible !important;
+        height: auto !important;
+        min-height: auto !important;
+        max-height: none !important;
+        line-height: normal !important;
+    }
+    /* 상태 바 및 모드 설명 텍스트 짤림 방지 */
+    .regime-status-bar {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        flex-wrap: wrap !important;
+        gap: 10px !important;
+        min-height: 28px !important;
+        height: auto !important;
+        overflow: visible !important;
+        padding: 2px 0 !important;
+    }
+    .regime-status-bar .regime-badge-container,
+    .regime-status-bar .regime-time-container {
+        display: inline-flex !important;
+        align-items: center !important;
+        overflow: visible !important;
+    }
+    .regime-status-bar .regime-badge {
+        display: inline-block !important;
+        line-height: 1.4 !important;
+        padding: 4px 8px !important;
+        box-sizing: border-box !important;
+        vertical-align: middle !important;
+    }
+    .sc-mode-tag-desc {
+        display: block !important;
+        line-height: 1.55 !important;
+        height: auto !important;
+        min-height: 26px !important;
+        overflow: visible !important;
+        word-break: keep-all !important;
     }
     /* 탭 패널 스크롤바 커스텀 */
     div[data-testid="stTabs"] [role="tabpanel"]::-webkit-scrollbar,
@@ -1450,7 +1508,7 @@ st.markdown("""
             min-height: 0 !important;
         }
         .st-key-main_tabs_header > div[data-testid="stElementContainer"],
-        .st-key-main_tabs_header [data-testid="stElementContainer"] {
+        .st-key-main_tabs_header > div.element-container {
             flex: 1 1 auto !important;
             height: 100% !important;
             min-height: 0 !important;
@@ -3106,7 +3164,7 @@ def render_domestic_market_ticker_bar():
     title_summary = f"[국내 주요 지수 및 비트코인 실시간 시황] {summary_text}"
 
     with st.expander(title_summary, expanded=True):
-        top_c1, top_c2 = st.columns([4.2, 1.2])
+        top_c1, top_c2 = st.columns([4.2, 1.2], vertical_alignment="center")
         with top_c1:
             st.markdown(
                 f'<div class="regime-status-bar">'
@@ -3182,7 +3240,7 @@ def render_us_market_macro_bar():
     )
 
     with st.expander(title_summary, expanded=True):
-        top_c1, top_c2 = st.columns([4.2, 1.2])
+        top_c1, top_c2 = st.columns([4.2, 1.2], vertical_alignment="center")
         with top_c1:
             st.markdown(
                 f'<div class="regime-status-bar">'
@@ -3325,7 +3383,7 @@ with tab1:
     else:
         m_tag = '<span style="color:#475569; font-weight:700;">[일반 퀀트]</span> Point-in-Time 복합 팩터 100점 만점 랭킹 시스템'
 
-    st.markdown(f'<div class="sc-mode-tag-desc" style="font-size:0.78rem; color:#475569; padding:4px 0 4px 2px; margin:0;">{m_tag}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="sc-mode-tag-desc" style="font-size:0.80rem; line-height:1.55; color:#475569; padding:4px 0 6px 2px; margin:0; overflow:visible;">{m_tag}</div>', unsafe_allow_html=True)
 
     # 전 전략 모드 공통: 시간대별 최적 권장 설정 자동화 엔진
     def get_auto_time_recommendation_for_strategy(strategy_mode, dt=None):
