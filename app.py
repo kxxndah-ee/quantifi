@@ -219,20 +219,16 @@ if "pending_tuning_updates" in st.session_state:
 # Custom CSS styling for badges, cards, and Korean fonts (Office Stealth Mode)
 st.markdown("""
 <style>
-    /* Streamlit Default Header: 투명화하여 고정 내비게이션 바를 가리지 않도록 처리 */
+    /* Streamlit Default Header: 최상단 버튼 짤림 방지 및 불필요한 기본 툴바 완전 제거 */
     header[data-testid="stHeader"] {
-        background: transparent !important;
+        display: none !important;
         height: 0px !important;
         min-height: 0px !important;
         padding: 0 !important;
-        pointer-events: none !important;
-        z-index: 10001 !important;
-    }
-    header[data-testid="stHeader"] [data-testid="stToolbar"] {
-        pointer-events: auto !important;
+        margin: 0 !important;
     }
 
-    /* 틀고정 레이아웃: 전체 뷰포트 고정 및 탭 패널 분할 스크롤 */
+    /* 틀고정 레이아웃: 상단 헤더 고정 및 탭 패널 분할 스크롤 */
     html, body {
         overflow: hidden !important;
         height: 100% !important;
@@ -259,8 +255,9 @@ st.markdown("""
         height: 100dvh !important;
         max-height: 100vh !important;
         max-height: 100dvh !important;
+        min-height: 0 !important;
         overflow: hidden !important;
-        padding-top: 0px !important;
+        padding-top: 4px !important;
         padding-bottom: 0px !important;
         padding-left: 1.5rem !important;
         padding-right: 1.5rem !important;
@@ -279,10 +276,12 @@ st.markdown("""
     div[data-testid="stMainBlockContainer"] > div[data-testid="stVerticalBlock"] {
         height: 100% !important;
         max-height: 100% !important;
+        min-height: 0 !important;
         overflow: hidden !important;
         display: flex !important;
         flex-direction: column !important;
         gap: 0px !important;
+        flex: 1 1 auto !important;
     }
     .stMainBlockContainer > .stVerticalBlock,
     .stVerticalBlock {
@@ -292,6 +291,7 @@ st.markdown("""
         gap: 0.35rem !important;
     }
     /* 상단 내비게이션 바 틀고정: 상단 헤더 영역 42px 정적 고정 */
+    div[data-testid="stElementContainer"]:has(.st-key-top_nav_bar),
     div[data-testid="stElementContainer"].st-key-top_nav_bar,
     .st-key-top_nav_bar {
         position: static !important;
@@ -642,7 +642,9 @@ st.markdown("""
         margin-bottom: 3px !important;
     }
     /* 틀고정 (Freeze Panes): 1~4번 탭 메뉴 바 및 탭 패널 분할 스크롤 */
+    div[data-testid="stElementContainer"]:has(.st-key-main_tabs_header),
     div[data-testid="stElementContainer"].st-key-main_tabs_header,
+    div.st-key-main_tabs_header,
     .st-key-main_tabs_header {
         position: static !important;
         width: 100% !important;
@@ -651,25 +653,28 @@ st.markdown("""
         flex: 1 1 auto !important;
         height: calc(100% - 42px) !important;
         max-height: calc(100% - 42px) !important;
+        min-height: 0 !important;
         display: flex !important;
         flex-direction: column !important;
         overflow: hidden !important;
     }
-    div.st-key-main_tabs_header div[data-testid="stTabs"],
-    div.st-key-main_tabs_header .stTabs,
-    div[data-testid="stTabs"] {
+    .st-key-main_tabs_header > div[data-testid="stElementContainer"],
+    .st-key-main_tabs_header [data-testid="stElementContainer"] {
+        flex: 1 1 auto !important;
         height: 100% !important;
-        max-height: 100% !important;
+        min-height: 0 !important;
         display: flex !important;
         flex-direction: column !important;
         overflow: hidden !important;
         margin: 0 !important;
         padding: 0 !important;
-        flex: 1 1 auto !important;
     }
-    div[data-testid="stTabs"] > div {
+    div[data-testid="stTabs"],
+    div.st-key-main_tabs_header div[data-testid="stTabs"],
+    div.st-key-main_tabs_header .stTabs {
         height: 100% !important;
         max-height: 100% !important;
+        min-height: 0 !important;
         display: flex !important;
         flex-direction: column !important;
         overflow: hidden !important;
@@ -678,6 +683,8 @@ st.markdown("""
         flex: 1 1 auto !important;
     }
     /* 1~4번 메인 탭바: 가로 100%, 높이 40px, 하단에 2px 견고한 분할선 (#E2E8F0) */
+    div[data-testid="stTabs"] > div[role="tablist"],
+    div[data-testid="stTabs"] > div.react-aria-TabList,
     div[data-testid="stTabs"] [role="tablist"],
     div[data-testid="stTabs"] .react-aria-TabList,
     div[data-testid="stTabs"] [data-baseweb="tab-list"] {
@@ -700,8 +707,11 @@ st.markdown("""
         flex-wrap: nowrap !important;
         overflow-x: auto !important;
         overflow-y: hidden !important;
+        z-index: 99 !important;
     }
-    /* 탭 패널: 메뉴 분할선 아래로만 독립 스크롤 생성 */
+    /* 탭 패널: 메뉴 분할선 아래로만 독립 스크롤 생성 (min-height: 0 및 overflow-y: auto) */
+    div[data-testid="stTabs"] > div[role="tabpanel"],
+    div[data-testid="stTabs"] > div.react-aria-TabPanel,
     div[data-testid="stTabs"] [role="tabpanel"],
     div[data-testid="stTabs"] .react-aria-TabPanel,
     div[data-testid="stTabs"] div[data-testid="stTabPanel"],
@@ -709,11 +719,12 @@ st.markdown("""
         flex: 1 1 auto !important;
         height: calc(100% - 40px) !important;
         max-height: calc(100% - 40px) !important;
+        min-height: 0 !important;
         overflow-y: auto !important;
         overflow-x: hidden !important;
         -webkit-overflow-scrolling: touch !important;
         padding-top: 10px !important;
-        padding-bottom: 3.5rem !important;
+        padding-bottom: 4rem !important;
         padding-right: 6px !important;
         box-sizing: border-box !important;
     }
@@ -1427,13 +1438,22 @@ st.markdown("""
         }
 
         /* Mobile Tabs Container: flex fill */
+        div[data-testid="stElementContainer"]:has(.st-key-main_tabs_header),
         div[data-testid="stElementContainer"].st-key-main_tabs_header,
+        div.st-key-main_tabs_header,
         .st-key-main_tabs_header {
             margin: 0 !important;
             padding: 0 !important;
             flex: 1 1 auto !important;
             height: calc(100% - 92px) !important;
             max-height: calc(100% - 92px) !important;
+            min-height: 0 !important;
+        }
+        .st-key-main_tabs_header > div[data-testid="stElementContainer"],
+        .st-key-main_tabs_header [data-testid="stElementContainer"] {
+            flex: 1 1 auto !important;
+            height: 100% !important;
+            min-height: 0 !important;
         }
         div[data-testid="stTabs"] [role="tablist"],
         div[data-testid="stTabs"] .react-aria-TabList,
@@ -1479,10 +1499,11 @@ st.markdown("""
             flex: 1 1 auto !important;
             height: calc(100% - 36px) !important;
             max-height: calc(100% - 36px) !important;
+            min-height: 0 !important;
             overflow-y: auto !important;
             overflow-x: hidden !important;
             padding-top: 6px !important;
-            padding-bottom: 2rem !important;
+            padding-bottom: 3rem !important;
             padding-right: 4px !important;
         }
 
@@ -3620,11 +3641,12 @@ with tab1:
                 st.markdown(
                     """
 <div style="font-size:0.78rem; line-height:1.45; color:#334155; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:10px 12px;">
-<div style="font-size:0.84rem; font-weight:700; color:#1E293B; margin-bottom:6px;">[장전 시초가 공략 모드] 핵심 원칙 (눌림 반등 + 주도 갭상승 복합)</div>
-• <strong>분석 시점</strong>: 매일 아침 08:00 ~ 08:50 (정규장 개장 전 전일 확정 데이터 기반 100% 안전 분석)<br>
+<div style="font-size:0.84rem; font-weight:700; color:#1E293B; margin-bottom:6px;">[장전 시초가 공략 모드] 핵심 원칙 (프리마켓 데이터 연동 + 눌림 반등 + 주도 갭상승)</div>
+• <strong>분석 시점</strong>: 매일 아침 08:00 ~ 08:50 (정규장 개장 전 전일 확정 데이터 + 글로벌 프리마켓 지표 기반 종합 분석)<br>
+• <strong>프리마켓 데이터 연동 분석</strong>: 미국 나스닥/S&P/SOXX 야간선물, 달러 환율, VIX 변동성을 연동하여 시초 갭상승 신뢰도를 검증하고 갭상승 음봉 트랩을 사전 차단합니다.<br>
 • <strong>트랙 1 (20일선 눌림목 반등)</strong>: 20일 일평균 거래대금 100억↑ & 20일선 이격도 98%~103.5% 첫 지지 반등 우량주 (시초 갭 -1.5%~+1.5% 진입, 익절 +2.5% / 손절 -2.0%)<br>
 • <strong>트랙 2 (주도 대장주 갭상승)</strong>: 전일 거래대금 800억~1,000억↑ 폭발 & 고가 마감 최상위 1등주 (동시호가 +1.5%~+4.5% 적정 갭 확인 후 시초가 진입, 익절 +4.0% / 손절 -2.5%)<br>
-• <strong>뇌동매매 방지</strong>: +5.0% 초과 과도한 갭상승 출발 종목은 장초반 차익 매물 위험으로 절대 추격 매수 금지
+• <strong>장전 동시호가(08:30~09:00) 원칙</strong>: 08:50 이전 호가는 허매수/허매도 왜곡이 심하므로, 08:50~09:00 형성되는 실체결 예상 갭(+1.5%~+4.5%)을 최종 확인하고 진입 (+5.0% 초과 과열 시 뇌동매매 금지)
 </div>
                     """,
                     unsafe_allow_html=True
@@ -4161,6 +4183,8 @@ with tab1:
             df_sc_disp["high_pct"] = df_sc_disp.get("change_pct", 0.0)
         if "low_pct" not in df_sc_disp.columns:
             df_sc_disp["low_pct"] = df_sc_disp.get("change_pct", 0.0)
+        if "premarket_regime" not in df_sc_disp.columns:
+            df_sc_disp["premarket_regime"] = "중립"
 
         if "장전" in sc_timing_filter:
             df_sc_disp = df_sc_disp[df_sc_disp["timing_label"].str.contains("08:00|장전", na=False)]
@@ -4198,7 +4222,7 @@ with tab1:
         elif "테이블" in sc_view_mode:
             st.caption(f"스크리닝 결과: **총 {total_sc_items:,}개** 발굴됨")
             desired_cols = [
-                "code", "name", "timing_label", "strategy_tag", "reason_summary", "market", "sector",
+                "code", "name", "timing_label", "strategy_tag", "premarket_regime", "reason_summary", "market", "sector",
                 "close", "change_pct", "open_pct", "high_pct", "low_pct",
                 "score", "label", "tp_pct", "sl_pct", "vol_ratio", "rsi", "ma_status"
             ]
@@ -4212,6 +4236,7 @@ with tab1:
                     "name": st.column_config.TextColumn("종목명", width="medium"),
                     "timing_label": st.column_config.TextColumn("매수 타이밍", width="medium"),
                     "strategy_tag": st.column_config.TextColumn("전략 태그", width="medium"),
+                    "premarket_regime": st.column_config.TextColumn("프리마켓 체제", help="미국 증시/야간선물/VIX/환율 글로벌 프리마켓 센티먼트", width="small"),
                     "reason_summary": st.column_config.TextColumn("선정 핵심 근거", width="large"),
                     "market": st.column_config.TextColumn("시장", width="small"),
                     "sector": st.column_config.TextColumn("업종", width="small"),
@@ -4334,11 +4359,15 @@ with tab1:
                 target_tp_val = sel_sc["close"] * (1.0 + sel_sc["tp_pct"] / 100.0)
                 target_sl_val = sel_sc["close"] * (1.0 - sel_sc["sl_pct"] / 100.0)
 
+                pm_reg = sel_sc.get("premarket_regime", "")
+                pm_guide_line = f"• **글로벌 프리마켓 지표**: 체제 **[{pm_reg}]** (리스크: {sel_sc.get('premarket_risk', '보통')}) | {sel_sc.get('premarket_gap_guide', '적정 갭 확인 후 시초가 주문')}\n\n" if pm_reg else ""
+
                 if "08:00" in timing_val or "장전" in timing_val:
                     st.success(
                         f"**[장전 시초가 공략: {sel_sc.get('strategy_tag', '')}]**\n\n"
+                        f"{pm_guide_line}"
                         f"• **장전 후보 압축 (08:00~08:50)**: 전일 확정 데이터 기준 눌림목 반등 및 주도 대장주 선별 완료\n\n"
-                        f"• **동시호가 갭 확인 (08:40~09:00)**: 예상 체결가 갭 점검 (눌림목 -1.5%~+1.5% / 주도주 +1.5%~+4.5% 적정 갭 확인 후 시초가 주문, +5% 초과 과열 시 진입 금지)\n\n"
+                        f"• **동시호가 갭 확인 (08:40~09:00)**: 예상 체결가 갭 점검 (08:50 이전 허수호가 주의, 실체결 적정 갭 확인 후 시초가 주문, +5% 초과 과열 시 진입 금지)\n\n"
                         f"• **목표 익절가**: **{target_tp_val:,.0f}원 (+{sel_sc['tp_pct']:.1f}%)** 도달 시 자동 분할 익절\n\n"
                         f"• **원칙 손절가**: **{target_sl_val:,.0f}원 (-{sel_sc['sl_pct']:.1f}%)** 이탈 시 즉시 기계적 손절"
                     )

@@ -265,3 +265,53 @@ def get_sector_macro_note(sector_name: str, us_summary: Optional[Dict[str, Any]]
         return notes.get("외인수급", "")
 
     return ""
+
+def get_premarket_analysis_context(us_summary: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """
+    Returns quantitative pre-market and global macro context for KOSPI/KOSDAQ market open:
+    - regime: '우호', '중립', '경계', '위험'
+    - score_mod: Score modifier between -5.0 and +3.0
+    - gap_risk: '낮음 (우호)', '보통 (중립)', '주의 (경계)', '높음 (위험)'
+    - gap_guide: practical open gap guideline (+1.5%~+4.5%)
+    - nasdaq_pct, sp500_pct, soxx_pct, vix_val, usdkrw_rate, action_guide
+    """
+    if us_summary is None:
+        us_summary = fetch_us_market_summary()
+
+    regime = us_summary.get("regime", "중립")
+    nasdaq = us_summary.get("nasdaq_pct", 0.0)
+    sp500 = us_summary.get("sp500_pct", 0.0)
+    soxx = us_summary.get("soxx_pct", 0.0)
+    vix = us_summary.get("vix_val", 16.0)
+    usdkrw = us_summary.get("usdkrw_rate", 1340.0)
+
+    if regime == "우호":
+        score_mod = 3.0
+        gap_risk = "낮음 (우호)"
+        gap_guide = "글로벌 훈풍으로 시초 갭상승 종목의 연속 슈팅 확률 우수 (적정 갭 +1.5%~+4.5% 공략, +5% 초과 과열은 윗꼬리 차익실현 경계)"
+    elif regime == "경계":
+        score_mod = -2.0
+        gap_risk = "주의 (경계)"
+        gap_guide = "미장 약세 조정 영향으로 시초 갭상승 후 음봉 전환(트랩) 주의 (무리한 시초가 추격 금지, 09:20 이후 저점 지지 확인 필수)"
+    elif regime == "위험":
+        score_mod = -5.0
+        gap_risk = "높음 (위험)"
+        gap_guide = "글로벌 급락 및 위험회피 고조 (시초 갭상승 추격매수 절대 금지, 20일선 첫 지지 반등 및 보수적 관망 권장)"
+    else:
+        score_mod = 0.0
+        gap_risk = "보통 (중립)"
+        gap_guide = "지수 영향 중립 (전일 800억~1,000억+ 폭발 주도 대장주 중심 적정 갭 +1.5%~+4.0% 선별 공략)"
+
+    return {
+        "regime": regime,
+        "score_mod": score_mod,
+        "gap_risk": gap_risk,
+        "gap_guide": gap_guide,
+        "nasdaq_pct": nasdaq,
+        "sp500_pct": sp500,
+        "soxx_pct": soxx,
+        "vix_val": vix,
+        "usdkrw_rate": usdkrw,
+        "action_guide": us_summary.get("action_guide", "")
+    }
+

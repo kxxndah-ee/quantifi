@@ -238,7 +238,12 @@ def _evaluate_single_stock(
                 ret_p = lead_metrics["ret_pct"]
                 hc_r = lead_metrics["hc_ratio"]
                 vr = lead_metrics["vol_ratio"]
-                lead_score = min(98.0, 78.0 + min(12.0, val_b / 250.0) + min(8.0, ret_p / 2.0))
+                pm_ctx = params.get("premarket_ctx") or {}
+                pm_regime = pm_ctx.get("regime", "중립")
+                pm_gap_guide = pm_ctx.get("gap_guide", "적정 갭 +1.5%~+4.5% 확인 후 진입")
+                pm_risk = pm_ctx.get("gap_risk", "보통 (중립)")
+                pm_mod = pm_ctx.get("score_mod", 0.0)
+                lead_score = min(99.0, max(60.0, min(98.0, 78.0 + min(12.0, val_b / 250.0) + min(8.0, ret_p / 2.0)) + pm_mod))
 
                 reason_summary = f"[주도 갭상승] 전일대금 {val_b:,.0f}억 폭발 | 종가 +{ret_p:.1f}% 고가마감 | 거래량 {vr:.1f}배"
                 reason_core = "전일 대규모 주도 거래대금을 분출하며 일봉 최고가권으로 마감한 시장 1등 대장주입니다. 장전 08:00~08:50 동시호가 예상체결가 점검 후 09:00 시초가 적정 갭상승(+1.5%~+4.5%) 출발 시 장초반 강력한 2차 슈팅 파동을 타겟합니다."
@@ -248,6 +253,7 @@ def _evaluate_single_stock(
                     f"고점 지지율 {hc_r:.1f}% (윗꼬리 적은 마루보즈형 종가 관리 매수세 확인)",
                     "이평선 정배열 (종가 > 5일선 > 20일선 단기 정배열 유지)",
                     "장전 시초가 체결 원칙: 예상 갭 +1.5% ~ +4.5% 적정 갭 확인 후 진입 (+5% 초과 과열 시 진입 금지)",
+                    f"글로벌 프리마켓 분석: 미증시/매크로 [{pm_regime}] (나스닥 {pm_ctx.get('nasdaq_pct', 0.0):+.2f}%, SOXX {pm_ctx.get('soxx_pct', 0.0):+.2f}%) - {pm_gap_guide}",
                     "목표 익절 +4.0% / 원칙 손절 -2.5% 자동 스탑로스"
                 ]
 
@@ -268,6 +274,9 @@ def _evaluate_single_stock(
                     "timing_label": "장전 (주도 갭상승)",
                     "strategy_mode": "PRE_MARKET_OPEN",
                     "strategy_tag": "장전시초가 (주도 갭상승)",
+                    "premarket_regime": pm_regime,
+                    "premarket_gap_guide": pm_gap_guide,
+                    "premarket_risk": pm_risk,
                     "score": lead_score,
                     "label": "강력 주도주" if lead_score >= 88 else "우량 주도주",
                     "tp_pct": 4.0,
@@ -295,12 +304,18 @@ def _evaluate_single_stock(
 
                 reason_summary = f"[눌림 반등] 20일선 이격도 {disp_val:.1f}% 지지 | 20일평균 대금 {avg_val_b:,.0f}억 | RSI {rsi_val:.1f}"
                 reason_core = "전일 확정 데이터 기준 20일 이동평균선 눌림목 첫 지지 반등이 검증된 풍부한 유동성의 우량주입니다. 08:00~08:50 후보 압축 후 09:00 시초가 보합권(-1.5%~+1.5%) 진입 시 안정적인 승률과 손익비를 목표로 합니다."
+                pm_ctx = params.get("premarket_ctx") or {}
+                pm_regime = pm_ctx.get("regime", "중립")
+                pm_gap_guide = pm_ctx.get("gap_guide", "보합권 -1.5%~+1.5% 진입")
+                pm_risk = pm_ctx.get("gap_risk", "보통 (중립)")
+
                 reason_criteria = [
                     "KODEX 200 지수 추세 필터 통과 (시스템적 하락장 차단)" if not ignore_market_filter else "개별 종목 기술적 지표 단독 검증",
                     f"20일 일평균 거래대금 {avg_val_b:,.0f}억 원 (기준 {min_val_krw_b}억 원 이상 충족)",
                     f"20일선 이격도 {disp_val:.1f}% (설정 기준 98.0% ~ {max_disparity_val:.1f}% 내 20일선 지지 반등)",
                     f"RSI(14) {rsi_val:.1f} (에너지 응축 건전한 반등 구간)",
                     "장전 시초가 체결 원칙: 시초가 갭 -1.5% ~ +1.5% 적정 보합권 진입 (+1.5% 초과 갭상승 시 진입 금지)",
+                    f"글로벌 프리마켓 점검: 미증시/매크로 [{pm_regime}] 상태 연동 - 20일선 눌림목 첫 반등 지지력 확인",
                     "목표 익절 +2.5% / 원칙 손절 -2.0% 자동 스탑로스"
                 ]
 
@@ -321,6 +336,9 @@ def _evaluate_single_stock(
                     "timing_label": "장전 (눌림 반등)",
                     "strategy_mode": "PRE_MARKET_OPEN",
                     "strategy_tag": "장전시초가 (눌림 반등)",
+                    "premarket_regime": pm_regime,
+                    "premarket_gap_guide": pm_gap_guide,
+                    "premarket_risk": pm_risk,
                     "score": snp["score"],
                     "label": snp["label"],
                     "tp_pct": 2.5,
@@ -362,11 +380,14 @@ def _evaluate_single_stock(
 
             reason_summary = f"대금 {today_val_b_val:,.0f}억 유입 | 시초대비 {gain_from_open_val:+.1f}% 돌파 | 양봉지지 {supp_ratio_val:.0f}%"
             reason_core = "장중 대규모 수급(거래대금)이 유입되며 시초가를 강력하게 상향 돌파하였고, 윗꼬리가 짧은 견고한 양봉 지지력을 유지하여 당일 장중 +5% 추가 슈팅 확률이 매우 높은 당일단타 주도주입니다."
+            pm_ctx = params.get("premarket_ctx") or {}
+            pm_regime = pm_ctx.get("regime", "중립")
             reason_criteria = [
                 f"당일 거래대금 {today_val_b_val:,.0f}억 원 유입 (최소 기준 {min_daytrade_val_b}억 원 충족)",
                 f"시초가 대비 {gain_from_open_val:+.1f}% 돌파 (유효 돌파 구간 +{intraday_gain_range[0]}% ~ +{intraday_gain_range[1]}% 충족)",
                 f"장중 전일 거래량 대비 {vol_ratio_prev_val*100:.0f}% 돌파 (수급 집중 기준 {min_daytrade_vol_ratio*100:.0f}% 충족)",
                 f"당일 진폭 중 고점 지지율 {supp_ratio_val:.1f}% (윗꼬리 짧은 탄탄한 양봉 지지, 65% 이상 충족)",
+                f"프리마켓 매크로 점검: 글로벌 체제 [{pm_regime}] 상태 연동 (목표 익절 +5.0% / 손절 -2.5% 당일 청산 준수)",
                 f"상한가(+30%)까지 잔여 상승폭 +{room_limit_val:.1f}% 확보 (목표 +5% 익절 공간 여유)"
             ]
 
@@ -387,6 +408,9 @@ def _evaluate_single_stock(
                 "timing_label": "장중 실시간 (09:10~14:30)",
                 "strategy_mode": "DAY_TRADE_5PCT",
                 "strategy_tag": "당일단타 (당일 +5%)",
+                "premarket_regime": pm_regime,
+                "premarket_gap_guide": "장중 09:10~14:30 실시간 수급 폭발 및 시초가 돌파 확인 후 진입",
+                "premarket_risk": pm_ctx.get("gap_risk", "보통 (중립)"),
                 "score": dtrade["score"],
                 "label": dtrade["label"],
                 "tp_pct": dtrade["tp_pct"],
@@ -795,6 +819,11 @@ class ScreeningWorker:
 
             # 3. Strategy setup & benchmark
             bm_ohlcv = get_benchmark_ohlcv() if ("스나이퍼" in sc_mode or "당일 단타" in sc_mode or "장전 시초가" in sc_mode or "08:00~09:00" in sc_mode) else None
+            try:
+                from src.collectors.us_market import get_premarket_analysis_context
+                params["premarket_ctx"] = get_premarket_analysis_context()
+            except Exception:
+                params["premarket_ctx"] = {}
             screened_results = []
 
             # Batch fetch real-time live quotes for sample pool to match HTS 100%
