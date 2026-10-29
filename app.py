@@ -877,6 +877,39 @@ st.markdown("""
     [data-testid="stBaseButton-primary"]:focus {
         box-shadow: 0 0 0 2px rgba(71, 85, 105, 0.25) !important;
     }
+    /* 검증&최적화 실행(활성화) 시 버튼 스타일: 기본 Primary 버튼과 완전히 동일한 크기/색상 유지 */
+    .btn-verification-running,
+    div.stButton.btn-verification-running > button,
+    button.btn-verification-running {
+        width: 100% !important;
+        height: 2rem !important;
+        min-height: 2rem !important;
+        background-color: #475569 !important;
+        border: 1px solid #334155 !important;
+        color: #FFFFFF !important;
+        padding: 0.35rem 0.8rem !important;
+        border-radius: 5px !important;
+        font-weight: 600 !important;
+        font-size: 0.80rem !important;
+        cursor: wait !important;
+        opacity: 1.0 !important;
+        box-shadow: none !important;
+        text-align: center !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+    }
+    div.stButton.btn-verification-running > button p,
+    button.btn-verification-running p {
+        margin: 0 !important;
+        padding: 0 !important;
+        font-size: 0.80rem !important;
+        font-weight: 600 !important;
+        color: #FFFFFF !important;
+        line-height: normal !important;
+    }
 
     /* Secondary buttons: Clean subtle border, soft grey background */
     div.stButton > button[kind="secondary"],
@@ -1437,8 +1470,16 @@ st.markdown("""
         div[data-testid="stMetricValue"] {
             font-size: 0.88rem !important;
         }
-        div.stButton:not(.st-key-btn_top_time_sync) > button {
+        div.stButton:not(.st-key-btn_top_time_sync) > button,
+        .btn-verification-running,
+        div.stButton.btn-verification-running > button,
+        button.btn-verification-running {
             min-height: 2.3rem !important;
+            height: 2.3rem !important;
+            font-size: 0.82rem !important;
+        }
+        div.stButton.btn-verification-running > button p,
+        button.btn-verification-running p {
             font-size: 0.82rem !important;
         }
         /* Expander Summary: word wrap without horizontal clipping */
@@ -5210,26 +5251,28 @@ def render_unified_verification_and_tuning_section():
                 p_val = max(0, min(100, pct))
                 btn_ph.markdown(
                     f'''
-                    <div style="width:100%; display:flex; height:38px; align-items:center;">
-                        <button disabled style="
-                            width: 100%;
-                            height: 38px;
-                            background: #2563EB;
-                            color: #FFFFFF;
-                            padding: 0 1rem;
-                            border-radius: 6px;
-                            border: none;
-                            font-weight: 700;
-                            font-size: 0.92rem;
-                            cursor: wait;
-                            opacity: 0.95;
-                            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                            text-align: center;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            margin: 0;
-                        ">검증&최적화({p_val}%)</button>
+                    <div class="stButton btn-verification-running" style="width:100%; display:flex; height:2rem; min-height:2rem; align-items:center; margin:0; padding:0;">
+                        <button kind="primary" data-testid="stBaseButton-primary" class="btn-verification-running" disabled style="
+                            width: 100% !important;
+                            height: 2rem !important;
+                            min-height: 2rem !important;
+                            background-color: #475569 !important;
+                            border: 1px solid #334155 !important;
+                            color: #FFFFFF !important;
+                            padding: 0.35rem 0.8rem !important;
+                            border-radius: 5px !important;
+                            font-weight: 600 !important;
+                            font-size: 0.80rem !important;
+                            cursor: wait !important;
+                            opacity: 1.0 !important;
+                            box-shadow: none !important;
+                            text-align: center !important;
+                            display: flex !important;
+                            align-items: center !important;
+                            justify-content: center !important;
+                            margin: 0 !important;
+                            box-sizing: border-box !important;
+                        "><p style="margin:0 !important; padding:0 !important; font-size:0.80rem !important; font-weight:600 !important; color:#FFFFFF !important; line-height:normal !important;">검증&최적화({p_val}%)</p></button>
                     </div>
                     ''',
                     unsafe_allow_html=True
