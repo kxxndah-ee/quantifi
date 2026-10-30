@@ -3237,19 +3237,33 @@ def render_domestic_market_ticker_bar():
             card_border = "1px solid #E2E8F0"
             card_bg = "#F8FAFC"
             card_extra_pill = ""
-            if code == "FUT" and (chg_pct <= -3.5 or chg_pct >= 3.5):
-                card_border = f"1.5px solid {badge_color}"
-                card_bg = "#FFFBEB" if level == "WARNING" else "#FEF2F2"
-                card_extra_pill = f'<div style="font-size:0.64rem; font-weight:700; color:{badge_color}; margin-top:2px;">사이드카 주의</div>'
-            elif code == "KQI150" and (chg_pct <= -4.5 or chg_pct >= 4.5):
-                card_border = f"1.5px solid {badge_color}"
-                card_bg = "#FFFBEB" if level == "WARNING" else "#FEF2F2"
-                card_extra_pill = f'<div style="font-size:0.64rem; font-weight:700; color:{badge_color}; margin-top:2px;">사이드카 주의</div>'
-            elif code in ("KOSPI", "KOSDAQ") and chg_pct <= -5.0:
-                card_border = f"1.5px solid {badge_color}"
-                card_bg = "#FFFBEB" if level == "WARNING" else "#FEF2F2"
-                card_extra_pill = f'<div style="font-size:0.64rem; font-weight:700; color:{badge_color}; margin-top:2px;">서킷 주의</div>'
-
+            if code == "FUT":
+                if chg_pct <= -5.0 or chg_pct >= 5.0:
+                    card_border = "2px solid #DC2626"
+                    card_bg = "#FEF2F2"
+                    card_extra_pill = '<div style="font-size:0.64rem; font-weight:700; color:#DC2626; margin-top:2px;">사이드카 발동</div>'
+                elif chg_pct <= -3.5 or chg_pct >= 3.5:
+                    card_border = f"1.5px solid {badge_color}"
+                    card_bg = "#FFFBEB"
+                    card_extra_pill = f'<div style="font-size:0.64rem; font-weight:700; color:{badge_color}; margin-top:2px;">사이드카 주의</div>'
+            elif code == "KQI150":
+                if chg_pct <= -6.0 or chg_pct >= 6.0:
+                    card_border = "2px solid #DC2626"
+                    card_bg = "#FEF2F2"
+                    card_extra_pill = '<div style="font-size:0.64rem; font-weight:700; color:#DC2626; margin-top:2px;">사이드카 발동</div>'
+                elif chg_pct <= -4.5 or chg_pct >= 4.5:
+                    card_border = f"1.5px solid {badge_color}"
+                    card_bg = "#FFFBEB"
+                    card_extra_pill = f'<div style="font-size:0.64rem; font-weight:700; color:{badge_color}; margin-top:2px;">사이드카 주의</div>'
+            elif code in ("KOSPI", "KOSDAQ"):
+                if chg_pct <= -8.0:
+                    card_border = "2px solid #DC2626"
+                    card_bg = "#FEF2F2"
+                    card_extra_pill = '<div style="font-size:0.64rem; font-weight:700; color:#DC2626; margin-top:2px;">서킷브레이커 발동</div>'
+                elif chg_pct <= -5.0:
+                    card_border = f"1.5px solid {badge_color}"
+                    card_bg = "#FFFBEB"
+                    card_extra_pill = f'<div style="font-size:0.64rem; font-weight:700; color:{badge_color}; margin-top:2px;">서킷 주의</div>'
             card_html = (
                 f'<div style="background:{card_bg}; border:{card_border}; border-radius:6px; padding:8px 4px 8px 4px; text-align:center; box-sizing:border-box;">'
                 f'<div style="font-size:0.70rem; color:#64748B; font-weight:600; margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{label}">{label}</div>'

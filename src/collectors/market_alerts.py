@@ -302,7 +302,26 @@ def evaluate_market_warning_alerts(
 
     if critical_alerts:
         level = "CRITICAL"
-        badge_text = "[사이드카/서킷브레이커 발동 경보]"
+        has_sidecar_crit = any(a["type"] == "SIDECAR" for a in critical_alerts)
+        has_cb_crit = any(a["type"] == "CIRCUIT_BREAKER" for a in critical_alerts)
+        if has_sidecar_crit and has_cb_crit:
+            badge_text = "[서킷브레이커 & 사이드카 발동]"
+        elif has_cb_crit:
+            cb_types = [a["id"] for a in critical_alerts if a["type"] == "CIRCUIT_BREAKER"]
+            if any("LV3" in cid for cid in cb_types):
+                badge_text = "[서킷브레이커 3단계 발동]"
+            elif any("LV2" in cid for cid in cb_types):
+                badge_text = "[서킷브레이커 2단계 발동]"
+            else:
+                badge_text = "[서킷브레이커 1단계 발동]"
+        elif has_sidecar_crit:
+            if any("BUY" in a["id"] for a in critical_alerts):
+                badge_text = "[매수 사이드카 발동]"
+            else:
+                badge_text = "[매도 사이드카 발동]"
+        else:
+            badge_text = "[시장 비상 발동 경보]"
+
         badge_color = "#DC2626"
         bg_color = "#FEF2F2"
         border_color = "#F87171"
