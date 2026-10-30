@@ -137,9 +137,9 @@ def fetch_domestic_indices_summary(force_refresh: bool = False) -> Dict[str, Any
             if cached_time:
                 c_dt = datetime.fromisoformat(cached_time)
                 age_seconds = (now_kst - c_dt).total_seconds()
-                # Fast 15s cache during market hours, 120s outside
+                # Fast 10s cache during market hours, 30s outside
                 is_market_hours = (9 <= now_kst.hour < 16)
-                ttl_limit = 15.0 if is_market_hours else 120.0
+                ttl_limit = 10.0 if is_market_hours else 30.0
                 if age_seconds < ttl_limit and len(cached.get("items", [])) >= 7:
                     return cached
         except Exception as e:

@@ -3139,20 +3139,34 @@ main_tab_names = [
 ]
 
 
+@st.fragment(run_every="10s")
 def render_domestic_market_ticker_bar():
     """
-    Renders Real-time Domestic Market Indices & Bitcoin Overview.
+    Renders Real-time Domestic Market Indices, Crypto & KRX Market Warning Alerts (Sidecar/Circuit Breakers).
+    Updates automatically every 10 seconds via background fragment without pressing '동기화'.
     Displays KOSPI, KOSDAQ, KOSPI 200, KOSPI 200 Futures, KOSDAQ 150, Korea Value-up, and Bitcoin (BTC).
-    Placed directly above US Market bar in Screener (Tab 1).
     """
     from src.collectors.domestic_indices import fetch_domestic_indices_summary
+    from src.collectors.market_alerts import evaluate_market_warning_alerts
 
     summary = fetch_domestic_indices_summary()
+    alert_data = evaluate_market_warning_alerts(domestic_summary=summary)
     items = summary.get("items", [])
     updated_at_str = summary.get("updated_at_str", "")
     summary_text = summary.get("summary_text", "")
 
-    title_summary = f"[국내 주요 지수 및 비트코인 실시간 시황] {summary_text}"
+    level = alert_data.get("level", "NORMAL")
+    badge_text = alert_data.get("badge_text", "[시장 안정]")
+    badge_color = alert_data.get("badge_color", "#059669")
+    summary_key = alert_data.get("summary_key", "")
+
+    # Toast notification when alert level transitions to WARNING or CRITICAL
+    if level in ("WARNING", "CRITICAL"):
+        if st.session_state.get("_last_toast_alert_key") != summary_key:
+            st.session_state["_last_toast_alert_key"] = summary_key
+            st.toast(f"[실시간 시장 경고] {alert_data.get('title', '')} (10초 자동 감시)")
+
+    title_summary = f"[국내 주요 지수 및 실시간 경보 감시] {summary_text} | {badge_text}"
 
     with st.expander(title_summary, expanded=True):
         top_c1, top_c2 = st.columns([4.2, 1.2], vertical_alignment="center")
@@ -3163,33 +3177,85 @@ def render_domestic_market_ticker_bar():
                 f'<span class="regime-badge" style="background:#0F172A; color:#FFFFFF; font-weight:700; font-size:0.75rem; padding:3px 8px; border-radius:4px; display:inline-block;">'
                 f'국내 정규장 & 가상자산 실시간 시세'
                 f'</span>'
+                f'<span class="regime-badge" style="background:{badge_color}; color:#FFFFFF; font-weight:700; font-size:0.75rem; padding:3px 8px; border-radius:4px; display:inline-block;">'
+                f'{badge_text}'
+                f'</span>'
                 f'</div>'
                 f'<div class="regime-time-container">'
+                f'<span class="regime-time" style="color:#0284C7; font-weight:700; font-size:0.72rem; display:inline-block;">● 실시간 감시 중 (10초 자동 갱신 · 동기화 불필요)</span>'
                 f'<span class="regime-time" style="color:#64748B; font-size:0.72rem; display:inline-block;">기준시각: {updated_at_str}</span>'
                 f'</div>'
                 f'</div>',
                 unsafe_allow_html=True
             )
         with top_c2:
-            if st.button("국내/코인 시세 갱신", key="btn_refresh_domestic_indices", use_container_width=True):
+            if st.button("실시간 즉시 갱신", key="btn_refresh_domestic_indices", use_container_width=True):
                 fetch_domestic_indices_summary(force_refresh=True)
-                st.toast("국내 주요 지수 및 비트코인 시세를 새로 수신했습니다.")
+                st.toast("국내 주요 지수 및 경고 알림 시세를 새로 갱신했습니다.")
                 st.rerun()
+
+        # If warning or critical alerts exist, show alert detail box
+        if level in ("WARNING", "CRITICAL") and alert_data.get("alerts"):
+            alert_items_pills = []
+            for alt in alert_data.get("alerts", []):
+                alt_badge = f'<span style="background:{badge_color}; color:#FFFFFF; font-weight:700; font-size:0.70rem; padding:1px 6px; border-radius:3px; margin-right:4px;">{alt["target"]}</span>'
+                alert_items_pills.append(
+                    f'<div style="font-size:0.75rem; line-height:1.45; color:#334155; margin-bottom:2px;">'
+                    f'{alt_badge} <strong>{alt["title"]}</strong> : {alt["message"]}'
+                    f'</div>'
+                )
+
+            st.markdown(
+                f'<div style="background:{alert_data.get("bg_color", "#FFFBEB")}; border:1px solid {alert_data.get("border_color", "#FBBF24")}; '
+                f'border-radius:6px; padding:8px 12px; margin:6px 0 8px 0; box-sizing:border-box;">'
+                f'<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; flex-wrap:wrap; gap:6px;">'
+                f'<div style="font-weight:800; font-size:0.82rem; color:{alert_data.get("text_color", "#92400E")};">'
+                f'{badge_text} {alert_data.get("title", "")}'
+                f'</div>'
+                f'<div style="font-size:0.70rem; font-weight:700; color:{alert_data.get("text_color", "#92400E")}; background:rgba(255,255,255,0.85); padding:1px 6px; border-radius:3px;">'
+                f'동기화 불필요 · 10초 주기 실시간 자동 감시'
+                f'</div>'
+                f'</div>'
+                f'<div style="font-size:0.78rem; font-weight:600; color:#1E293B; margin-bottom:5px; line-height:1.4;">'
+                f'대응 가이드: {alert_data.get("action_guide", "")}'
+                f'</div>'
+                f'{"".join(alert_items_pills)}'
+                f'</div>',
+                unsafe_allow_html=True
+            )
 
         cards_html = []
         for it in items:
             label = it.get("name", "")
+            code = it.get("code", "")
             disp_price = it.get("display_price", "0.00")
             chg_pct = it.get("change_pct", 0.0)
             color = "#DC2626" if chg_pct > 0 else ("#2563EB" if chg_pct < 0 else "#475569")
             sign = "+" if chg_pct > 0 else ""
             chg_str = f"{sign}{chg_pct:.2f}%"
 
+            card_border = "1px solid #E2E8F0"
+            card_bg = "#F8FAFC"
+            card_extra_pill = ""
+            if code == "FUT" and (chg_pct <= -3.5 or chg_pct >= 3.5):
+                card_border = f"1.5px solid {badge_color}"
+                card_bg = "#FFFBEB" if level == "WARNING" else "#FEF2F2"
+                card_extra_pill = f'<div style="font-size:0.64rem; font-weight:700; color:{badge_color}; margin-top:2px;">사이드카 주의</div>'
+            elif code == "KQI150" and (chg_pct <= -4.5 or chg_pct >= 4.5):
+                card_border = f"1.5px solid {badge_color}"
+                card_bg = "#FFFBEB" if level == "WARNING" else "#FEF2F2"
+                card_extra_pill = f'<div style="font-size:0.64rem; font-weight:700; color:{badge_color}; margin-top:2px;">사이드카 주의</div>'
+            elif code in ("KOSPI", "KOSDAQ") and chg_pct <= -5.0:
+                card_border = f"1.5px solid {badge_color}"
+                card_bg = "#FFFBEB" if level == "WARNING" else "#FEF2F2"
+                card_extra_pill = f'<div style="font-size:0.64rem; font-weight:700; color:{badge_color}; margin-top:2px;">서킷 주의</div>'
+
             card_html = (
-                f'<div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 4px 8px 4px; text-align:center; box-sizing:border-box;">'
+                f'<div style="background:{card_bg}; border:{card_border}; border-radius:6px; padding:8px 4px 8px 4px; text-align:center; box-sizing:border-box;">'
                 f'<div style="font-size:0.70rem; color:#64748B; font-weight:600; margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{label}">{label}</div>'
                 f'<div style="font-size:0.84rem; font-weight:700; color:#1E293B; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{disp_price}</div>'
                 f'<div style="font-size:0.72rem; font-weight:700; color:{color}; line-height:1.25; margin-top:3px; white-space:nowrap;">{chg_str}</div>'
+                f'{card_extra_pill}'
                 f'</div>'
             )
             cards_html.append(card_html)
@@ -3327,6 +3393,45 @@ else:
 _def_tab = st.session_state.get('main_active_tab_nav', main_tab_names[0])
 if _def_tab not in main_tab_names:
     _def_tab = main_tab_names[0]
+
+@st.fragment(run_every="10s")
+def render_top_realtime_market_alert_banner():
+    """
+    Renders top-level real-time market alert banner across all tabs.
+    Updates every 10 seconds automatically without clicking '동기화'.
+    Shows immediately if Sidecar or Circuit Breaker alert triggers.
+    """
+    from src.collectors.market_alerts import get_realtime_market_alerts
+
+    alert_data = get_realtime_market_alerts()
+    level = alert_data.get("level", "NORMAL")
+    if level in ("WARNING", "CRITICAL"):
+        badge_text = alert_data.get("badge_text", "")
+        summary_text = alert_data.get("summary_text", "")
+        bg_col = alert_data.get("bg_color", "#FFFBEB")
+        border_col = alert_data.get("border_color", "#FBBF24")
+        text_col = alert_data.get("text_color", "#92400E")
+        badge_col = alert_data.get("badge_color", "#D97706")
+        updated_at = alert_data.get("updated_at_str", "")
+
+        banner_html = (
+            f'<div class="top-realtime-alert-banner" style="background:{bg_col}; border:1px solid {border_col}; border-radius:6px; '
+            f'padding:7px 12px; margin:4px 0 8px 0; box-sizing:border-box;">'
+            f'<div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">'
+            f'<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">'
+            f'<span style="background:{badge_col}; color:#FFFFFF; font-weight:800; font-size:0.75rem; padding:3px 8px; border-radius:4px; display:inline-block;">{badge_text}</span>'
+            f'<span style="font-weight:700; font-size:0.82rem; color:{text_col};">{summary_text}</span>'
+            f'</div>'
+            f'<div style="display:flex; align-items:center; gap:8px;">'
+            f'<span style="font-size:0.72rem; color:#64748B;">● 실시간 감시 (10초 자동 갱신 · 동기화 불필요) | {updated_at}</span>'
+            f'</div>'
+            f'</div>'
+            f'</div>'
+        )
+        st.markdown(banner_html, unsafe_allow_html=True)
+
+
+render_top_realtime_market_alert_banner()
 
 tab1, tab2, tab3, tab4 = st.tabs(main_tab_names, default=_def_tab)
 
