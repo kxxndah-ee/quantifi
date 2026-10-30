@@ -1555,6 +1555,170 @@ st.markdown("""
             border-radius: 6px !important;
             margin-bottom: 6px !important;
         }
+
+        /* Mobile: 스크리너 필터 & 화면 모드 툴바 전용 최적화 (2열 + 2열 + 1열 전폭 세그먼트 버튼) */
+        .st-key-sc_filter_toolbar,
+        div[data-testid="stElementContainer"].st-key-sc_filter_toolbar {
+            width: 100% !important;
+            margin: 4px 0 8px 0 !important;
+        }
+        .st-key-sc_filter_toolbar [data-testid="stHorizontalBlock"],
+        div[data-testid="stHorizontalBlock"]:has(.st-key-sc_view_radio) {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: wrap !important;
+            gap: 8px 8px !important;
+            width: 100% !important;
+            align-items: flex-start !important;
+        }
+        /* 1행 좌측: 매수 타이밍 분류 필터 (50%) */
+        .st-key-sc_filter_toolbar [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:has(.st-key-sc_timing_sel),
+        .st-key-sc_filter_toolbar [data-testid="stHorizontalBlock"] > div[data-testid="column"]:has(.st-key-sc_timing_sel),
+        div[data-testid="stHorizontalBlock"]:has(.st-key-sc_view_radio) > div[data-testid="stColumn"]:has(.st-key-sc_timing_sel),
+        div[data-testid="stHorizontalBlock"]:has(.st-key-sc_view_radio) > div[data-testid="column"]:has(.st-key-sc_timing_sel),
+        .st-key-sc_filter_toolbar [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-child(1),
+        .st-key-sc_filter_toolbar [data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(1) {
+            flex: 1 1 calc(50% - 4px) !important;
+            min-width: calc(50% - 4px) !important;
+            max-width: calc(50% - 4px) !important;
+            width: calc(50% - 4px) !important;
+            box-sizing: border-box !important;
+        }
+        /* 1행 우측: 정렬 기준 (50%) */
+        .st-key-sc_filter_toolbar [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:has(.st-key-sc_sort_sel),
+        .st-key-sc_filter_toolbar [data-testid="stHorizontalBlock"] > div[data-testid="column"]:has(.st-key-sc_sort_sel),
+        div[data-testid="stHorizontalBlock"]:has(.st-key-sc_view_radio) > div[data-testid="stColumn"]:has(.st-key-sc_sort_sel),
+        div[data-testid="stHorizontalBlock"]:has(.st-key-sc_view_radio) > div[data-testid="column"]:has(.st-key-sc_sort_sel),
+        .st-key-sc_filter_toolbar [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-child(2),
+        .st-key-sc_filter_toolbar [data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(2) {
+            flex: 1 1 calc(50% - 4px) !important;
+            min-width: calc(50% - 4px) !important;
+            max-width: calc(50% - 4px) !important;
+            width: calc(50% - 4px) !important;
+            box-sizing: border-box !important;
+        }
+        /* 2행 좌측: 업종/테마 필터 (58%) */
+        .st-key-sc_filter_toolbar [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:has(.st-key-sc_sector_sel),
+        .st-key-sc_filter_toolbar [data-testid="stHorizontalBlock"] > div[data-testid="column"]:has(.st-key-sc_sector_sel),
+        div[data-testid="stHorizontalBlock"]:has(.st-key-sc_view_radio) > div[data-testid="stColumn"]:has(.st-key-sc_sector_sel),
+        div[data-testid="stHorizontalBlock"]:has(.st-key-sc_view_radio) > div[data-testid="column"]:has(.st-key-sc_sector_sel),
+        .st-key-sc_filter_toolbar [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-child(3),
+        .st-key-sc_filter_toolbar [data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(3) {
+            flex: 1 1 calc(58% - 4px) !important;
+            min-width: calc(55% - 4px) !important;
+            max-width: calc(60% - 4px) !important;
+            width: calc(58% - 4px) !important;
+            box-sizing: border-box !important;
+        }
+        /* 2행 우측: 표시 높이 (42%) */
+        .st-key-sc_filter_toolbar [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:has(.st-key-sc_display_rows_sel),
+        .st-key-sc_filter_toolbar [data-testid="stHorizontalBlock"] > div[data-testid="column"]:has(.st-key-sc_display_rows_sel),
+        div[data-testid="stHorizontalBlock"]:has(.st-key-sc_view_radio) > div[data-testid="stColumn"]:has(.st-key-sc_display_rows_sel),
+        div[data-testid="stHorizontalBlock"]:has(.st-key-sc_view_radio) > div[data-testid="column"]:has(.st-key-sc_display_rows_sel),
+        .st-key-sc_filter_toolbar [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-child(4),
+        .st-key-sc_filter_toolbar [data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(4) {
+            flex: 1 1 calc(42% - 4px) !important;
+            min-width: calc(40% - 4px) !important;
+            max-width: calc(45% - 4px) !important;
+            width: calc(42% - 4px) !important;
+            box-sizing: border-box !important;
+        }
+        /* 3행: 화면 모드 라디오 (100% 전폭) */
+        .st-key-sc_filter_toolbar [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:has(.st-key-sc_view_radio),
+        .st-key-sc_filter_toolbar [data-testid="stHorizontalBlock"] > div[data-testid="column"]:has(.st-key-sc_view_radio),
+        div[data-testid="stHorizontalBlock"]:has(.st-key-sc_view_radio) > div[data-testid="stColumn"]:has(.st-key-sc_view_radio),
+        div[data-testid="stHorizontalBlock"]:has(.st-key-sc_view_radio) > div[data-testid="column"]:has(.st-key-sc_view_radio),
+        .st-key-sc_filter_toolbar [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-child(5),
+        .st-key-sc_filter_toolbar [data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(5) {
+            flex: 1 1 100% !important;
+            min-width: 100% !important;
+            max-width: 100% !important;
+            width: 100% !important;
+            margin-top: 2px !important;
+            box-sizing: border-box !important;
+        }
+        /* 화면 모드 위젯 타이틀 라벨 */
+        div[data-testid="stRadio"].st-key-sc_view_radio > label,
+        div[data-testid="stRadio"].st-key-sc_view_radio > label[data-testid="stWidgetLabel"],
+        .st-key-sc_view_radio > label {
+            width: 100% !important;
+            display: block !important;
+            margin-bottom: 3px !important;
+            font-size: 0.76rem !important;
+            font-weight: 600 !important;
+            padding: 0 !important;
+            border: none !important;
+            background: transparent !important;
+        }
+        /* 화면 모드 라디오 옵션 선택 버튼들: 1행 2열 가로 정렬 */
+        div[data-testid="stRadio"].st-key-sc_view_radio > div[role="radiogroup"],
+        .st-key-sc_view_radio div[role="radiogroup"],
+        div[data-testid="stHorizontalBlock"]:has(.st-key-sc_view_radio) .st-key-sc_view_radio div[role="radiogroup"] {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            width: 100% !important;
+            gap: 6px !important;
+            padding: 4px !important;
+            background: #F8FAFC !important;
+            border: 1px solid #CBD5E1 !important;
+            border-radius: 6px !important;
+            box-sizing: border-box !important;
+        }
+        div[data-testid="stRadio"].st-key-sc_view_radio div[role="radiogroup"] > label,
+        .st-key-sc_view_radio div[role="radiogroup"] > label {
+            flex: 1 1 50% !important;
+            width: 50% !important;
+            min-width: 0 !important;
+            padding: 7px 4px !important;
+            margin: 0 !important;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+            justify-content: center !important;
+            align-items: center !important;
+            display: flex !important;
+            box-sizing: border-box !important;
+            border-radius: 4px !important;
+            border: 1px solid #CBD5E1 !important;
+            background: #FFFFFF !important;
+        }
+        div[data-testid="stRadio"].st-key-sc_view_radio div[role="radiogroup"] > label *,
+        .st-key-sc_view_radio div[role="radiogroup"] > label * {
+            font-size: 0.72rem !important;
+            letter-spacing: -0.3px !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+        div[data-testid="stRadio"].st-key-sc_view_radio div[role="radiogroup"] > label:has(input:checked),
+        .st-key-sc_view_radio div[role="radiogroup"] > label:has(input:checked) {
+            background: #334155 !important;
+            border-color: #1E293B !important;
+        }
+        div[data-testid="stRadio"].st-key-sc_view_radio div[role="radiogroup"] > label:has(input:checked) *,
+        .st-key-sc_view_radio div[role="radiogroup"] > label:has(input:checked) * {
+            color: #FFFFFF !important;
+            font-weight: 700 !important;
+        }
+        /* 툴바 내 라벨 및 셀렉트 폰트 정리 */
+        .st-key-sc_filter_toolbar label[data-testid="stWidgetLabel"],
+        div[data-testid="stHorizontalBlock"]:has(.st-key-sc_view_radio) label[data-testid="stWidgetLabel"] {
+            font-size: 0.76rem !important;
+            font-weight: 600 !important;
+            margin-bottom: 2px !important;
+            white-space: nowrap !important;
+        }
+        .st-key-sc_filter_toolbar label[data-testid="stWidgetLabel"] p,
+        div[data-testid="stHorizontalBlock"]:has(.st-key-sc_view_radio) label[data-testid="stWidgetLabel"] p {
+            font-size: 0.76rem !important;
+            font-weight: 600 !important;
+            margin: 0 !important;
+            white-space: nowrap !important;
+        }
+        .st-key-sc_filter_toolbar div[data-baseweb="select"] *,
+        div[data-testid="stHorizontalBlock"]:has(.st-key-sc_view_radio) div[data-baseweb="select"] * {
+            font-size: 0.78rem !important;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -4022,36 +4186,37 @@ with tab1:
                 )
 
         # Filter & View Toolbar
-        sc_t1, sc_t2, sc_t3, sc_t4, sc_t5 = st.columns([1.8, 1.6, 1.5, 1.1, 1.6])
-        with sc_t1:
-            sc_timing_filter = st.selectbox(
-                "매수 타이밍 분류 필터",
-                [
-                    "전체 타이밍",
-                    "장전 시초가 공략 후보",
-                    "장중 실시간 (09:10~14:30) 당일단타 후보",
-                    "장초 (09:00 시초가) 스나이퍼 후보",
-                    "마감 직전 (15:20 종가) 5%급등 후보"
-                ],
-                index=0,
-                key="sc_timing_sel"
-            )
-        with sc_t2:
-            sc_sort_options = ["익일 스코어 높은 순", "전일대비 등락률 높은 순", "목표 익절가 높은 순", "종목명 가나다순"]
-            if st.session_state.get("sc_sort_sel") not in sc_sort_options:
-                st.session_state["sc_sort_sel"] = "익일 스코어 높은 순"
-            sc_sort = st.selectbox(
-                "정렬 기준",
-                sc_sort_options,
-                key="sc_sort_sel"
-            )
-        with sc_t3:
-            avail_sectors = ["전체"] + sorted(list(set(df_screened["sector"].dropna().unique())))
-            sc_sector_filter = st.selectbox("업종/테마 필터", avail_sectors, index=0, key="sc_sector_sel")
-        with sc_t4:
-            sc_display_rows = st.selectbox("표시 높이", [10, 15, 20, 30], index=0, format_func=lambda x: f"{x}줄 보기", key="sc_display_rows_sel")
-        with sc_t5:
-            sc_view_mode = st.radio("화면 모드", ["고밀도 테이블 뷰 (권장)", "카드 페이징 뷰"], horizontal=True, key="sc_view_radio")
+        with st.container(key="sc_filter_toolbar"):
+            sc_t1, sc_t2, sc_t3, sc_t4, sc_t5 = st.columns([1.8, 1.6, 1.5, 1.1, 1.6])
+            with sc_t1:
+                sc_timing_filter = st.selectbox(
+                    "매수 타이밍 분류 필터",
+                    [
+                        "전체 타이밍",
+                        "장전 시초가 공략 후보",
+                        "장중 실시간 (09:10~14:30) 당일단타 후보",
+                        "장초 (09:00 시초가) 스나이퍼 후보",
+                        "마감 직전 (15:20 종가) 5%급등 후보"
+                    ],
+                    index=0,
+                    key="sc_timing_sel"
+                )
+            with sc_t2:
+                sc_sort_options = ["익일 스코어 높은 순", "전일대비 등락률 높은 순", "목표 익절가 높은 순", "종목명 가나다순"]
+                if st.session_state.get("sc_sort_sel") not in sc_sort_options:
+                    st.session_state["sc_sort_sel"] = "익일 스코어 높은 순"
+                sc_sort = st.selectbox(
+                    "정렬 기준",
+                    sc_sort_options,
+                    key="sc_sort_sel"
+                )
+            with sc_t3:
+                avail_sectors = ["전체"] + sorted(list(set(df_screened["sector"].dropna().unique())))
+                sc_sector_filter = st.selectbox("업종/테마 필터", avail_sectors, index=0, key="sc_sector_sel")
+            with sc_t4:
+                sc_display_rows = st.selectbox("표시 높이", [10, 15, 20, 30], index=0, format_func=lambda x: f"{x}줄 보기", key="sc_display_rows_sel")
+            with sc_t5:
+                sc_view_mode = st.radio("화면 모드", ["고밀도 테이블 뷰 (권장)", "카드 페이징 뷰"], horizontal=True, key="sc_view_radio")
 
         # Apply Sorting & Sector Filter & Timing Filter
         df_sc_disp = df_screened.copy()
