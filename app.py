@@ -3505,7 +3505,7 @@ def render_domestic_market_ticker_bar():
                 f'<div class="regime-status-bar">'
                 f'<div class="regime-badge-container">'
                 f'<span class="regime-badge" style="background:#0F172A; color:#FFFFFF; font-weight:700; font-size:0.75rem; padding:3px 8px; border-radius:4px; display:inline-block;">'
-                f'국내 정규장 & 가상자산 실시간 시세'
+                f'국장'
                 f'</span>'
                 f'<span class="regime-badge" style="background:{badge_color}; color:#FFFFFF; font-weight:700; font-size:0.75rem; padding:3px 8px; border-radius:4px; display:inline-block;">'
                 f'{badge_text}'
@@ -3637,7 +3637,7 @@ def render_us_market_macro_bar():
     title_summary = (
         f"[전일 미장 및 글로벌 매크로 퀀트 점검] "
         f"나스닥 {nasdaq_pct:+.2f}% · S&P500 {sp500_pct:+.2f}% · SOXX {soxx_pct:+.2f}% · 환율 {usdkrw_val:,.1f}원 "
-        f"| 미국 증시: [{regime}] {regime_desc}"
+        f"| 미장: [{regime}] {regime_desc}"
     )
 
     with st.expander(title_summary, expanded=True):
@@ -3647,7 +3647,7 @@ def render_us_market_macro_bar():
                 f'<div class="regime-status-bar">'
                 f'<div class="regime-badge-container">'
                 f'<span class="regime-badge" style="background:#0F172A; color:#FFFFFF; font-weight:700; font-size:0.75rem; padding:3px 8px; border-radius:4px; display:inline-block;">'
-                f'미국 증시'
+                f'미장'
                 f'</span>'
                 f'<span class="regime-badge" style="background:{regime_color}; color:#FFFFFF; font-weight:700; font-size:0.75rem; padding:3px 8px; border-radius:4px; display:inline-block;">'
                 f'[{regime}] {regime_desc}'
