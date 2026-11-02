@@ -1167,7 +1167,53 @@ st.markdown("""
             margin: 0 !important;
             margin-left: 0 !important;
         }
-        /* Desktop table styling */
+            /* Compact small styling for domestic & US market refresh buttons */
+    div[data-testid="stButton"].st-key-btn_refresh_domestic_indices,
+    div[data-testid="stButton"].st-key-btn_refresh_us_market,
+    .st-key-btn_refresh_domestic_indices,
+    .st-key-btn_refresh_us_market {
+        display: flex !important;
+        justify-content: flex-end !important;
+        align-items: center !important;
+        width: 100% !important;
+        margin: 0 !important;
+    }
+    div[data-testid="stButton"].st-key-btn_refresh_domestic_indices > button,
+    div[data-testid="stButton"].st-key-btn_refresh_us_market > button,
+    .st-key-btn_refresh_domestic_indices button,
+    .st-key-btn_refresh_us_market button {
+        height: 26px !important;
+        min-height: 26px !important;
+        max-height: 26px !important;
+        font-size: 0.72rem !important;
+        padding: 0 10px !important;
+        line-height: 24px !important;
+        width: auto !important;
+        border-radius: 4px !important;
+        background: #F8FAFC !important;
+        border: 1px solid #CBD5E1 !important;
+        color: #475569 !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+    }
+    div[data-testid="stButton"].st-key-btn_refresh_domestic_indices > button:hover,
+    div[data-testid="stButton"].st-key-btn_refresh_us_market > button:hover,
+    .st-key-btn_refresh_domestic_indices button:hover,
+    .st-key-btn_refresh_us_market button:hover {
+        background: #F1F5F9 !important;
+        color: #0F172A !important;
+        border-color: #94A3B8 !important;
+    }
+    div[data-testid="stButton"].st-key-btn_refresh_domestic_indices button p,
+    div[data-testid="stButton"].st-key-btn_refresh_us_market button p,
+    .st-key-btn_refresh_domestic_indices button p,
+    .st-key-btn_refresh_us_market button p {
+        font-size: 0.72rem !important;
+        line-height: 24px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* Desktop table styling */
         div[data-testid="stTable"],
         .stTable {
             width: 100% !important;
@@ -1430,16 +1476,25 @@ st.markdown("""
             flex: 0 0 100% !important;
             max-width: 100% !important;
         }
-        div[data-testid="stButton"].st-key-btn_refresh_us_market {
+        div[data-testid="stButton"].st-key-btn_refresh_domestic_indices,
+        div[data-testid="stButton"].st-key-btn_refresh_us_market,
+        .st-key-btn_refresh_domestic_indices,
+        .st-key-btn_refresh_us_market {
+            display: flex !important;
+            justify-content: flex-start !important;
+            width: auto !important;
             margin-top: 2px !important;
             margin-bottom: 4px !important;
         }
+        div[data-testid="stButton"].st-key-btn_refresh_domestic_indices button,
         div[data-testid="stButton"].st-key-btn_refresh_us_market button {
-            height: 28px !important;
-            min-height: 28px !important;
-            font-size: 12px !important;
-            line-height: 26px !important;
+            height: 26px !important;
+            min-height: 26px !important;
+            max-height: 26px !important;
+            font-size: 11.5px !important;
+            line-height: 24px !important;
             padding: 0px 8px !important;
+            width: auto !important;
         }
 
         /* Mobile: Strictly 1 mode per line vertically stacked, zero indentation */
@@ -3169,7 +3224,7 @@ def render_domestic_market_ticker_bar():
     title_summary = f"[국내 주요 지수 및 실시간 경보 감시] {summary_text} | {badge_text}"
 
     with st.expander(title_summary, expanded=True):
-        top_c1, top_c2 = st.columns([4.2, 1.2], vertical_alignment="center")
+        top_c1, top_c2 = st.columns([5.2, 0.8], vertical_alignment="center")
         with top_c1:
             st.markdown(
                 f'<div class="regime-status-bar">'
@@ -3181,15 +3236,15 @@ def render_domestic_market_ticker_bar():
                 f'{badge_text}'
                 f'</span>'
                 f'</div>'
-                f'<div class="regime-time-container">'
-                f'<span class="regime-time" style="color:#0284C7; font-weight:700; font-size:0.72rem; display:inline-block;">● 실시간 감시 중 (10초 자동 갱신 · 동기화 불필요)</span>'
+                f'<div class="regime-time-container" style="display:inline-flex; align-items:center; gap:8px;">'
                 f'<span class="regime-time" style="color:#64748B; font-size:0.72rem; display:inline-block;">기준시각: {updated_at_str}</span>'
+                f'<span class="regime-time" style="color:#0284C7; font-weight:700; font-size:0.72rem; display:inline-block;">● 실시간 감시 중 (10초 자동 갱신 · 동기화 불필요)</span>'
                 f'</div>'
                 f'</div>',
                 unsafe_allow_html=True
             )
         with top_c2:
-            if st.button("실시간 즉시 갱신", key="btn_refresh_domestic_indices", use_container_width=True):
+            if st.button("실시간 즉시 갱신", key="btn_refresh_domestic_indices", use_container_width=False):
                 fetch_domestic_indices_summary(force_refresh=True)
                 st.toast("국내 주요 지수 및 경고 알림 시세를 새로 갱신했습니다.")
                 st.rerun()
@@ -3307,27 +3362,30 @@ def render_us_market_macro_bar():
     title_summary = (
         f"[전일 미장 및 글로벌 매크로 퀀트 점검] "
         f"나스닥 {nasdaq_pct:+.2f}% · S&P500 {sp500_pct:+.2f}% · SOXX {soxx_pct:+.2f}% · 환율 {usdkrw_val:,.1f}원 "
-        f"| 체제: {regime}"
+        f"| 미국 증시: [{regime}] {regime_desc}"
     )
 
     with st.expander(title_summary, expanded=True):
-        top_c1, top_c2 = st.columns([4.2, 1.2], vertical_alignment="center")
+        top_c1, top_c2 = st.columns([5.2, 0.8], vertical_alignment="center")
         with top_c1:
             st.markdown(
                 f'<div class="regime-status-bar">'
                 f'<div class="regime-badge-container">'
+                f'<span class="regime-badge" style="background:#0F172A; color:#FFFFFF; font-weight:700; font-size:0.75rem; padding:3px 8px; border-radius:4px; display:inline-block;">'
+                f'미국 증시'
+                f'</span>'
                 f'<span class="regime-badge" style="background:{regime_color}; color:#FFFFFF; font-weight:700; font-size:0.75rem; padding:3px 8px; border-radius:4px; display:inline-block;">'
-                f'글로벌 체제: {regime} ({regime_desc})'
+                f'[{regime}] {regime_desc}'
                 f'</span>'
                 f'</div>'
-                f'<div class="regime-time-container">'
+                f'<div class="regime-time-container" style="display:inline-flex; align-items:center; gap:8px;">'
                 f'<span class="regime-time" style="color:#64748B; font-size:0.72rem; display:inline-block;">기준시각: {updated_at_str}</span>'
                 f'</div>'
                 f'</div>',
                 unsafe_allow_html=True
             )
         with top_c2:
-            if st.button("미장 시세 갱신", key="btn_refresh_us_market", use_container_width=True):
+            if st.button("미장 시세 갱신", key="btn_refresh_us_market", use_container_width=False):
                 fetch_us_market_summary(force_refresh=True)
                 st.toast("전일 미장 및 매크로 지표를 새로 수신했습니다.")
                 st.rerun()
@@ -3437,7 +3495,7 @@ def render_top_realtime_market_alert_banner():
             f'<span style="font-weight:700; font-size:0.82rem; color:{text_col};">{summary_text}</span>'
             f'</div>'
             f'<div style="display:flex; align-items:center; gap:8px;">'
-            f'<span style="font-size:0.72rem; color:#64748B;">● 실시간 감시 (10초 자동 갱신 · 동기화 불필요) | {updated_at}</span>'
+            f'<span style="font-size:0.72rem; color:#64748B;">기준시각: {updated_at} | ● 실시간 감시 (10초 자동 갱신 · 동기화 불필요)</span>'
             f'</div>'
             f'</div>'
             f'</div>'
