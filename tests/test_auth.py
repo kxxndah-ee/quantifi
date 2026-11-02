@@ -26,8 +26,7 @@ class TestAppAuthentication(unittest.TestCase):
              patch("streamlit.columns", return_value=[MagicMock(), MagicMock(), MagicMock()]), \
              patch("streamlit.form", return_value=MagicMock()), \
              patch("streamlit.text_input", return_value=""), \
-             patch("streamlit.form_submit_button", return_value=False), \
-             patch("streamlit.expander", return_value=MagicMock()):
+             patch("streamlit.form_submit_button", return_value=False):
             result = app.check_app_access()
             self.assertFalse(result)
 

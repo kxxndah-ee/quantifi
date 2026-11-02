@@ -1968,16 +1968,7 @@ def check_app_access() -> bool:
                 else:
                     st.error("비밀번호가 일치하지 않습니다. 다시 입력해주세요.")
 
-        with st.expander("비밀번호 설정 및 보안 안내", expanded=False):
-            st.markdown(
-                """
-                **보안 및 비밀번호 변경 가이드**:
-                - **기본 비밀번호**: `quantifi!2026`
-                - **로컬 실행 시 변경**: `.streamlit/secrets.toml` 파일에 `APP_PASSWORD = "나만의비밀번호"`를 입력합니다.
-                - **Streamlit Cloud 배포 시 변경**: App Settings > Secrets에 `APP_PASSWORD = "나만의비밀번호"`를 입력하시면 코드 수정 없이 즉시 반영됩니다.
-                - **간편 바로가기**: 북마크 URL 뒤에 `?token=비밀번호`를 붙여 접속하시면 매번 입력할 필요 없이 1초 만에 자동 로그인됩니다.
-                """
-            )
+
 
     return False
 
