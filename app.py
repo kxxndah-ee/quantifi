@@ -3345,7 +3345,7 @@ def render_us_market_macro_bar():
             item = metrics.get(k_name, {})
             val = item.get("close", 0.0)
             chg_pct = item.get("change_pct", 0.0)
-            color = "#DC2626" if chg_pct < 0 else ("#059669" if chg_pct > 0 else "#475569")
+            color = "#DC2626" if chg_pct > 0 else ("#2563EB" if chg_pct < 0 else "#475569")
             card_html = (
                 f'<div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 4px 8px 4px; text-align:center; box-sizing:border-box;">'
                 f'<div style="font-size:0.70rem; color:#64748B; font-weight:600; margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{label}">{label}</div>'
@@ -4353,6 +4353,12 @@ with tab1:
             df_sc_disp["low_pct"] = df_sc_disp.get("change_pct", 0.0)
         if "premarket_regime" not in df_sc_disp.columns:
             df_sc_disp["premarket_regime"] = "중립"
+        if "vol_ratio" not in df_sc_disp.columns:
+            df_sc_disp["vol_ratio"] = 1.0
+        if "rsi" not in df_sc_disp.columns:
+            df_sc_disp["rsi"] = 50.0
+        if "market" not in df_sc_disp.columns:
+            df_sc_disp["market"] = "KOSPI"
 
         if "장전" in sc_timing_filter:
             df_sc_disp = df_sc_disp[df_sc_disp["timing_label"].str.contains("08:00|장전", na=False)]
@@ -4367,9 +4373,9 @@ with tab1:
             df_sc_disp = df_sc_disp[df_sc_disp["sector"] == sc_sector_filter]
 
         if sc_sort == "익일 스코어 높은 순":
-            df_sc_disp = df_sc_disp.sort_values("score", ascending=False)
+            df_sc_disp = df_sc_disp.sort_values(by=["score", "change_pct", "close"], ascending=[False, False, False])
         elif sc_sort == "전일대비 등락률 높은 순":
-            df_sc_disp = df_sc_disp.sort_values("change_pct", ascending=False)
+            df_sc_disp = df_sc_disp.sort_values(by=["change_pct", "score", "close"], ascending=[False, False, False])
         elif sc_sort == "목표 익절가 높은 순":
             df_sc_disp = df_sc_disp.sort_values("tp_pct", ascending=False)
         elif sc_sort == "종목명 가나다순":
@@ -4390,9 +4396,19 @@ with tab1:
         elif "테이블" in sc_view_mode:
             st.caption(f"스크리닝 결과: **총 {total_sc_items:,}개** 발굴됨")
             desired_cols = [
-                "code", "name", "timing_label", "strategy_tag", "premarket_regime", "reason_summary", "market", "sector",
-                "close", "change_pct", "open_pct", "high_pct", "low_pct",
-                "score", "label", "tp_pct", "sl_pct", "vol_ratio", "rsi", "ma_status"
+                "market",
+                "code",
+                "name",
+                "close",
+                "change_pct",
+                "open_pct",
+                "high_pct",
+                "low_pct",
+                "score",
+                "label",
+                "reason_summary",
+                "vol_ratio",
+                "rsi",
             ]
             valid_cols = [c for c in desired_cols if c in df_sc_disp.columns]
             disp_table_sc = df_sc_disp[valid_cols].copy()
@@ -4400,26 +4416,19 @@ with tab1:
             grid_sc = st.dataframe(
                 disp_table_sc,
                 column_config={
+                    "market": st.column_config.TextColumn("시장", width="small"),
                     "code": st.column_config.TextColumn("코드", width="small"),
                     "name": st.column_config.TextColumn("종목명", width="medium"),
-                    "timing_label": st.column_config.TextColumn("매수 타이밍", width="medium"),
-                    "strategy_tag": st.column_config.TextColumn("전략 태그", width="medium"),
-                    "premarket_regime": st.column_config.TextColumn("프리마켓 체제", help="미국 증시/야간선물/VIX/환율 글로벌 프리마켓 센티먼트", width="small"),
-                    "reason_summary": st.column_config.TextColumn("선정 핵심 근거", width="large"),
-                    "market": st.column_config.TextColumn("시장", width="small"),
-                    "sector": st.column_config.TextColumn("업종", width="small"),
                     "close": st.column_config.NumberColumn("현재가", format="%,d원"),
                     "change_pct": st.column_config.NumberColumn("현재가(%)", help="전일 종가 대비 현재가 등락률", format="%+.2f%%"),
                     "open_pct": st.column_config.NumberColumn("시가(%)", help="전일 종가 대비 당일 시초가 등락률", format="%+.2f%%"),
                     "high_pct": st.column_config.NumberColumn("고가(%)", help="전일 종가 대비 당일 최고가 등락률", format="%+.2f%%"),
                     "low_pct": st.column_config.NumberColumn("저가(%)", help="전일 종가 대비 당일 최저가 등락률", format="%+.2f%%"),
-                    "score": st.column_config.ProgressColumn("익일 스코어", min_value=0, max_value=100, format="%.1f점"),
+                    "score": st.column_config.ProgressColumn("익일스코어", min_value=0, max_value=100, format="%.1f점"),
                     "label": st.column_config.TextColumn("전망"),
-                    "tp_pct": st.column_config.NumberColumn("목표익절", format="+%.1f%%"),
-                    "sl_pct": st.column_config.NumberColumn("손절기준", format="-%.1f%%"),
+                    "reason_summary": st.column_config.TextColumn("선정 핵심 근거", width="large"),
                     "vol_ratio": st.column_config.NumberColumn("거래량비", format="%.1f배"),
-                    "rsi": st.column_config.NumberColumn("RSI(14)", format="%.1f"),
-                    "ma_status": st.column_config.TextColumn("이평배열"),
+                    "rsi": st.column_config.NumberColumn("RSI", format="%.1f"),
                 },
                 hide_index=True,
                 use_container_width=True,
