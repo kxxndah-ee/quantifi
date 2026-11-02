@@ -545,12 +545,28 @@ st.markdown("""
     }
     .quant-qa-body-wrap blockquote,
     div[data-testid="stChatMessage"] blockquote {
-        font-size: 0.76rem !important;
-        padding: 4px 8px !important;
-        margin: 4px 0 6px 0 !important;
-        border-left: 3px solid #64748B !important;
-        background: #F8FAFC !important;
-        border-radius: 3px !important;
+        font-size: 0.90rem !important;
+        padding: 12px 16px !important;
+        margin: 6px 0 14px 0 !important;
+        border-left: 5px solid #0284C7 !important;
+        background: #F0F9FF !important;
+        border: 1px solid #BAE6FD !important;
+        border-radius: 8px !important;
+        box-shadow: 0 1px 3px rgba(2, 132, 199, 0.06) !important;
+    }
+    .quant-qa-body-wrap blockquote p,
+    div[data-testid="stChatMessage"] blockquote p {
+        font-size: 0.90rem !important;
+        line-height: 1.6 !important;
+        color: #0F172A !important;
+        font-weight: 700 !important;
+        margin: 0 !important;
+    }
+    .quant-qa-body-wrap blockquote strong,
+    div[data-testid="stChatMessage"] blockquote strong {
+        font-size: 0.90rem !important;
+        font-weight: 800 !important;
+        color: #0369A1 !important;
     }
     div[data-testid="stChatMessage"] {
         padding: 0.4rem 0.6rem !important;
@@ -1167,7 +1183,24 @@ st.markdown("""
             margin: 0 !important;
             margin-left: 0 !important;
         }
-            /* Compact small styling for domestic & US market refresh buttons */
+            /* Compact small styling for domestic & US market refresh buttons: pinned to far right */
+    div[data-testid="stColumn"]:has(.st-key-btn_refresh_domestic_indices),
+    div[data-testid="stColumn"]:has(.st-key-btn_refresh_us_market),
+    div[data-testid="column"]:has(.st-key-btn_refresh_domestic_indices),
+    div[data-testid="column"]:has(.st-key-btn_refresh_us_market) {
+        display: flex !important;
+        justify-content: flex-end !important;
+        align-items: center !important;
+        text-align: right !important;
+    }
+    div[data-testid="stElementContainer"]:has(.st-key-btn_refresh_domestic_indices),
+    div[data-testid="stElementContainer"]:has(.st-key-btn_refresh_us_market) {
+        display: flex !important;
+        justify-content: flex-end !important;
+        align-items: center !important;
+        width: 100% !important;
+        margin-left: auto !important;
+    }
     div[data-testid="stButton"].st-key-btn_refresh_domestic_indices,
     div[data-testid="stButton"].st-key-btn_refresh_us_market,
     .st-key-btn_refresh_domestic_indices,
@@ -1177,6 +1210,7 @@ st.markdown("""
         align-items: center !important;
         width: 100% !important;
         margin: 0 !important;
+        margin-left: auto !important;
     }
     div[data-testid="stButton"].st-key-btn_refresh_domestic_indices > button,
     div[data-testid="stButton"].st-key-btn_refresh_us_market > button,
@@ -1194,6 +1228,8 @@ st.markdown("""
         border: 1px solid #CBD5E1 !important;
         color: #475569 !important;
         box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+        margin-left: auto !important;
+        float: right !important;
     }
     div[data-testid="stButton"].st-key-btn_refresh_domestic_indices > button:hover,
     div[data-testid="stButton"].st-key-btn_refresh_us_market > button:hover,
@@ -1476,15 +1512,26 @@ st.markdown("""
             flex: 0 0 100% !important;
             max-width: 100% !important;
         }
+        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) > div[data-testid="stColumn"]:has(.st-key-btn_refresh_domestic_indices),
+        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) > div[data-testid="stColumn"]:has(.st-key-btn_refresh_us_market),
+        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) > div[data-testid="column"]:has(.st-key-btn_refresh_domestic_indices),
+        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) > div[data-testid="column"]:has(.st-key-btn_refresh_us_market) {
+            display: flex !important;
+            justify-content: flex-end !important;
+            align-items: center !important;
+            width: 100% !important;
+        }
         div[data-testid="stButton"].st-key-btn_refresh_domestic_indices,
         div[data-testid="stButton"].st-key-btn_refresh_us_market,
         .st-key-btn_refresh_domestic_indices,
         .st-key-btn_refresh_us_market {
             display: flex !important;
-            justify-content: flex-start !important;
-            width: auto !important;
+            justify-content: flex-end !important;
+            align-items: center !important;
+            width: 100% !important;
             margin-top: 2px !important;
             margin-bottom: 4px !important;
+            margin-left: auto !important;
         }
         div[data-testid="stButton"].st-key-btn_refresh_domestic_indices button,
         div[data-testid="stButton"].st-key-btn_refresh_us_market button {
@@ -1495,6 +1542,7 @@ st.markdown("""
             line-height: 24px !important;
             padding: 0px 8px !important;
             width: auto !important;
+            margin-left: auto !important;
         }
 
         /* Mobile: Strictly 1 mode per line vertically stacked, zero indentation */
@@ -2639,7 +2687,7 @@ def render_quant_analyst_qa_box(stock_row, key_suffix=""):
         )
 
         with st.chat_message("assistant"):
-            st.markdown(f"<div class='quant-qa-body-wrap'>\n\n{active_ans_disp}\n\n</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='quant-qa-body-wrap'>\n\n{_strip_redundant_qa_headers(active_ans_disp)}\n\n</div>", unsafe_allow_html=True)
 
         # Custom Question Form
         with st.form(key=f"custom_q_form_{code}_{key_suffix}", clear_on_submit=True):
@@ -2672,27 +2720,79 @@ def render_quant_analyst_qa_box(stock_row, key_suffix=""):
             with st.expander(f"이전 질의응답 기록 ({len(st.session_state[hist_key])}건)", expanded=False):
                 for h_idx, h in enumerate(reversed(st.session_state[hist_key][:-1])):
                     st.markdown(f"**[질문] {h['q']}**")
-                    st.markdown(h['ans'])
+                    st.markdown(f"<div class='quant-qa-body-wrap'>\n\n{_strip_redundant_qa_headers(h['ans'])}\n\n</div>", unsafe_allow_html=True)
                     if h_idx < len(st.session_state[hist_key]) - 2:
                         st.divider()
 
 
 def _strip_redundant_qa_headers(ans_text: str) -> str:
-    """Removes leading markdown title (### ...) and '- **질문 분석**: ...' line from displayed answer."""
+    """
+    Removes redundant headers and elevates '[수석 애널리스트 핵심 직답]' into a prominent,
+    highly readable callout card (sky-blue highlight with navy badge).
+    """
     if not ans_text:
         return ""
     lines = ans_text.splitlines()
     cleaned = []
+    direct_lines = []
+    is_direct_block = False
+
     for line in lines:
         s = line.strip()
-        if not cleaned and not s:
+        if not cleaned and not direct_lines and not s:
             continue
-        if not cleaned and s.startswith("###"):
+        if not cleaned and not direct_lines and s.startswith("###"):
             continue
         if "질문 분석" in s and (s.startswith("-") or s.startswith("•") or s.startswith("*")):
             continue
+
+        is_direct_match = (
+            (s.startswith(">") and ("핵심 직답" in s or "수석 애널리스트" in s or "직답" in s)) or
+            s.startswith("**[수석 애널리스트 핵심 직답]") or
+            s.startswith("**[핵심 직답]") or
+            s.startswith("[수석 애널리스트 핵심 직답]") or
+            s.startswith("[핵심 직답]")
+        )
+        if is_direct_match:
+            is_direct_block = True
+            clean_s = re.sub(r"^>*\s*(\*\*\[.*?\]\*\*:?|\[.*?\]:?)\s*", "", s).strip()
+            if clean_s:
+                direct_lines.append(clean_s)
+            continue
+        elif is_direct_block:
+            if s.startswith(">"):
+                direct_lines.append(s.lstrip("> ").strip())
+                continue
+            elif not s:
+                is_direct_block = False
+            else:
+                is_direct_block = False
+
         cleaned.append(line)
-    return "\n".join(cleaned).strip()
+
+    body_text = "\n".join(cleaned).strip()
+
+    if direct_lines:
+        direct_text = " ".join(direct_lines)
+        formatted_direct = re.sub(r"\*\*(.*?)\*\*", r'<strong style="color:#0369A1; font-weight:800;">\1</strong>', direct_text)
+        formatted_direct = re.sub(r"(\[[^\]]+\])", r'<span style="color:#0284C7; font-weight:800; background:rgba(2,132,199,0.08); padding:1px 4px; border-radius:3px;">\1</span>', formatted_direct)
+
+        direct_box_html = (
+            f'<div class="qa-highlight-direct-box" style="background:#F0F9FF; border:1px solid #BAE6FD; '
+            f'border-left:5px solid #0284C7; border-radius:8px; padding:12px 16px; margin:6px 0 14px 0; '
+            f'box-shadow:0 1px 3px rgba(2,132,199,0.06); box-sizing:border-box;">\n'
+            f'<div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap;">\n'
+            f'<span style="background:#0F172A; color:#FFFFFF; font-weight:800; font-size:0.75rem; padding:3px 8px; border-radius:4px; letter-spacing:0.2px;">핵심 직답</span>\n'
+            f'<span style="color:#0284C7; font-weight:700; font-size:0.78rem;">수석 애널리스트 즉시 판정</span>\n'
+            f'</div>\n'
+            f'<div style="font-size:0.90rem; font-weight:700; color:#0F172A; line-height:1.6; word-break:keep-all;">\n'
+            f'{formatted_direct}\n'
+            f'</div>\n'
+            f'</div>\n\n'
+        )
+        return direct_box_html + body_text
+
+    return body_text
 
 
 def render_analyst_factsheet_and_qa_tab():
@@ -3224,7 +3324,7 @@ def render_domestic_market_ticker_bar():
     title_summary = f"[국내 주요 지수 및 실시간 경보 감시] {summary_text} | {badge_text}"
 
     with st.expander(title_summary, expanded=True):
-        top_c1, top_c2 = st.columns([5.2, 0.8], vertical_alignment="center")
+        top_c1, top_c2 = st.columns([5.4, 0.6], vertical_alignment="center")
         with top_c1:
             st.markdown(
                 f'<div class="regime-status-bar">'
@@ -3244,7 +3344,7 @@ def render_domestic_market_ticker_bar():
                 unsafe_allow_html=True
             )
         with top_c2:
-            if st.button("실시간 즉시 갱신", key="btn_refresh_domestic_indices", use_container_width=False):
+            if st.button("갱신", key="btn_refresh_domestic_indices", use_container_width=False):
                 fetch_domestic_indices_summary(force_refresh=True)
                 st.toast("국내 주요 지수 및 경고 알림 시세를 새로 갱신했습니다.")
                 st.rerun()
@@ -3366,7 +3466,7 @@ def render_us_market_macro_bar():
     )
 
     with st.expander(title_summary, expanded=True):
-        top_c1, top_c2 = st.columns([5.2, 0.8], vertical_alignment="center")
+        top_c1, top_c2 = st.columns([5.4, 0.6], vertical_alignment="center")
         with top_c1:
             st.markdown(
                 f'<div class="regime-status-bar">'
@@ -3385,7 +3485,7 @@ def render_us_market_macro_bar():
                 unsafe_allow_html=True
             )
         with top_c2:
-            if st.button("미장 시세 갱신", key="btn_refresh_us_market", use_container_width=False):
+            if st.button("갱신", key="btn_refresh_us_market", use_container_width=False):
                 fetch_us_market_summary(force_refresh=True)
                 st.toast("전일 미장 및 매크로 지표를 새로 수신했습니다.")
                 st.rerun()
