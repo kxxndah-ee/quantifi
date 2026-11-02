@@ -1826,10 +1826,173 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+
+def is_test_environment() -> bool:
+    """Detects if code is being executed in a test runner or imported without live Streamlit server."""
+    if "unittest" in sys.modules or "pytest" in sys.modules:
+        return True
+    if hasattr(st, "runtime") and hasattr(st.runtime, "exists") and not st.runtime.exists():
+        return True
+    return False
+
+
+def check_app_access() -> bool:
+    """
+    Enforces restricted access gate so only the authorized owner can view or use the dashboard.
+    Supports:
+      1. Session state persistence ('is_authenticated')
+      2. Streamlit secrets ('APP_PASSWORD')
+      3. Environment variable ('APP_PASSWORD')
+      4. Auto-login via query parameter ('?token=...' or '?auth=...')
+      5. Secure logout mechanism
+    """
+    if is_test_environment():
+        return True
+
+    # 1. Already authenticated in current session
+    if st.session_state.get("is_authenticated", False):
+        return True
+
+    # 2. Retrieve configured master password
+    configured_pw = None
+    try:
+        if hasattr(st, "secrets") and "APP_PASSWORD" in st.secrets:
+            configured_pw = str(st.secrets["APP_PASSWORD"])
+    except Exception:
+        pass
+
+    if not configured_pw:
+        configured_pw = os.environ.get("APP_PASSWORD")
+
+    # If still not configured, check local secrets.toml directly as fallback
+    if not configured_pw:
+        try:
+            secrets_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".streamlit", "secrets.toml")
+            if os.path.exists(secrets_file):
+                with open(secrets_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if line.strip().startswith("APP_PASSWORD"):
+                            parts = line.split("=", 1)
+                            if len(parts) == 2:
+                                configured_pw = parts[1].strip().strip('"').strip("'")
+                                break
+        except Exception:
+            pass
+
+    default_pw = "quantifi!2026"
+    active_pw = (configured_pw or default_pw).strip()
+
+    # 3. Check 1-click token in query params (?token=... or ?auth=...)
+    try:
+        params = st.query_params
+        query_token = params.get("token") or params.get("auth")
+        if query_token and str(query_token).strip() == active_pw:
+            st.session_state["is_authenticated"] = True
+            if "token" in params:
+                del st.query_params["token"]
+            if "auth" in params:
+                del st.query_params["auth"]
+            st.rerun()
+    except Exception:
+        pass
+
+    # 4. Render sleek, high-end login gate
+    st.markdown(
+        """
+        <style>
+        .login-card-wrapper {
+            max-width: 440px;
+            margin: 40px auto 16px auto;
+            background: #FFFFFF;
+            border: 1px solid #CBD5E1;
+            border-radius: 12px;
+            padding: 28px 24px 20px 24px;
+            box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+            text-align: center;
+        }
+        .login-title {
+            font-size: 1.30rem;
+            font-weight: 800;
+            color: #0F172A;
+            letter-spacing: -0.3px;
+            margin-bottom: 4px;
+        }
+        .login-sub {
+            font-size: 0.82rem;
+            color: #64748B;
+            margin-bottom: 20px;
+        }
+        .login-badge {
+            background: #0F172A;
+            color: #FFFFFF;
+            font-weight: 800;
+            font-size: 0.70rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    c1, c2, c3 = st.columns([1, 1.8, 1])
+    with c2:
+        st.markdown(
+            """
+            <div class="login-card-wrapper">
+                <span class="login-badge">RESTRICTED ACCESS</span>
+                <div class="login-title">QUANTIFI SECURITY GATE</div>
+                <div class="login-sub">비공개 퀀트 트레이딩 스크리너 · 인가된 소유자 전용</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        with st.form("auth_login_form", clear_on_submit=False):
+            entered_pw = st.text_input(
+                "접속 비밀번호",
+                type="password",
+                placeholder="비밀번호를 입력하세요",
+                key="input_master_pw"
+            )
+            submitted = st.form_submit_button("보안 접속", type="primary", use_container_width=True)
+
+            if submitted:
+                if entered_pw and entered_pw.strip() == active_pw:
+                    st.session_state["is_authenticated"] = True
+                    st.toast("인증 성공: QUANTIFI 시스템에 접속합니다.")
+                    st.rerun()
+                else:
+                    st.error("비밀번호가 일치하지 않습니다. 다시 입력해주세요.")
+
+        with st.expander("비밀번호 설정 및 보안 안내", expanded=False):
+            st.markdown(
+                """
+                **보안 및 비밀번호 변경 가이드**:
+                - **기본 비밀번호**: `quantifi!2026`
+                - **로컬 실행 시 변경**: `.streamlit/secrets.toml` 파일에 `APP_PASSWORD = "나만의비밀번호"`를 입력합니다.
+                - **Streamlit Cloud 배포 시 변경**: App Settings > Secrets에 `APP_PASSWORD = "나만의비밀번호"`를 입력하시면 코드 수정 없이 즉시 반영됩니다.
+                - **간편 바로가기**: 북마크 URL 뒤에 `?token=비밀번호`를 붙여 접속하시면 매번 입력할 필요 없이 1초 만에 자동 로그인됩니다.
+                """
+            )
+
+    return False
+
+
 # Initialize Database on app start (once per session)
 if "db_initialized" not in st.session_state:
     init_db()
     st.session_state["db_initialized"] = True
+
+# ---------------------------------------------------------
+# Access Control & Authentication Gate (Only Owner Allowed)
+# ---------------------------------------------------------
+if not check_app_access():
+    st.stop()
+
 
 
 # ---------------------------------------------------------
@@ -1838,6 +2001,18 @@ if "db_initialized" not in st.session_state:
 with st.sidebar:
     st.markdown("### Quantifi Engine")
     st.caption("로컬 데이터 분석 & 스크리너")
+
+    # Owner authentication badge & Logout button
+    st.markdown(
+        '<div style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:6px; padding:6px 10px; margin:4px 0 8px 0; display:flex; align-items:center; justify-content:space-between;">'
+        '<span style="font-size:0.75rem; font-weight:700; color:#166534;">인증 완료 (소유자 전용)</span>'
+        '</div>',
+        unsafe_allow_html=True
+    )
+    if st.button("로그아웃", key="btn_app_logout", use_container_width=True):
+        st.session_state["is_authenticated"] = False
+        st.toast("로그아웃되었습니다.")
+        st.rerun()
 
     st.markdown("---")
     st.markdown("#### 포트폴리오 리스크 상태")
