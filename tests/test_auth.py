@@ -32,7 +32,7 @@ class TestAppAuthentication(unittest.TestCase):
 
     @patch("app.is_test_environment", return_value=False)
     @patch("streamlit.session_state", {"is_authenticated": False})
-    @patch("streamlit.query_params", {"token": "quantifi!2026"})
+    @patch("streamlit.query_params", {"token": "500djrqnwk"})
     def test_query_token_auto_login(self, mock_test_env):
         with patch("streamlit.rerun") as mock_rerun:
             result = app.check_app_access()

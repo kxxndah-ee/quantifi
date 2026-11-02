@@ -1879,7 +1879,7 @@ def check_app_access() -> bool:
         except Exception:
             pass
 
-    default_pw = "quantifi!2026"
+    default_pw = "500djrqnwk"
     active_pw = (configured_pw or default_pw).strip()
 
     # 3. Check 1-click token in query params (?token=... or ?auth=...)
