@@ -1183,70 +1183,112 @@ st.markdown("""
             margin: 0 !important;
             margin-left: 0 !important;
         }
-            /* Compact small styling for domestic & US market refresh buttons: pinned to far right */
-    div[data-testid="stColumn"]:has(.st-key-btn_refresh_domestic_indices),
-    div[data-testid="stColumn"]:has(.st-key-btn_refresh_us_market),
-    div[data-testid="column"]:has(.st-key-btn_refresh_domestic_indices),
-    div[data-testid="column"]:has(.st-key-btn_refresh_us_market) {
+    /* Compact small styling for domestic & US market refresh buttons: pinned flush to far right */
+    div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_domestic_indices),
+    div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_us_market) {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        width: 100% !important;
+        gap: 8px !important;
+    }
+    div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_domestic_indices) > div[data-testid="stColumn"]:first-child,
+    div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_domestic_indices) > div[data-testid="column"]:first-child,
+    div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_us_market) > div[data-testid="stColumn"]:first-child,
+    div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_us_market) > div[data-testid="column"]:first-child {
+        flex: 1 1 auto !important;
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: calc(100% - 50px) !important;
+    }
+    div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_domestic_indices) > div[data-testid="stColumn"]:last-child,
+    div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_domestic_indices) > div[data-testid="column"]:last-child,
+    div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_us_market) > div[data-testid="stColumn"]:last-child,
+    div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_us_market) > div[data-testid="column"]:last-child {
+        flex: 0 0 auto !important;
+        width: auto !important;
+        min-width: 0 !important;
+        margin-left: auto !important;
         display: flex !important;
         justify-content: flex-end !important;
         align-items: center !important;
-        text-align: right !important;
+        padding: 0 !important;
     }
+    div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_domestic_indices) > div:last-child div[data-testid="stVerticalBlockBorderWrapper"],
+    div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_domestic_indices) > div:last-child div[data-testid="stVerticalBlock"],
+    div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_us_market) > div:last-child div[data-testid="stVerticalBlockBorderWrapper"],
+    div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_us_market) > div:last-child div[data-testid="stVerticalBlock"] {
+        display: flex !important;
+        align-items: flex-end !important;
+        justify-content: flex-end !important;
+        width: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .st-key-btn_refresh_domestic_indices,
+    .st-key-btn_refresh_us_market,
     div[data-testid="stElementContainer"]:has(.st-key-btn_refresh_domestic_indices),
     div[data-testid="stElementContainer"]:has(.st-key-btn_refresh_us_market) {
         display: flex !important;
-        justify-content: flex-end !important;
         align-items: center !important;
-        width: 100% !important;
-        margin-left: auto !important;
-    }
-    div[data-testid="stButton"].st-key-btn_refresh_domestic_indices,
-    div[data-testid="stButton"].st-key-btn_refresh_us_market,
-    .st-key-btn_refresh_domestic_indices,
-    .st-key-btn_refresh_us_market {
-        display: flex !important;
         justify-content: flex-end !important;
-        align-items: center !important;
-        width: 100% !important;
+        width: auto !important;
         margin: 0 !important;
         margin-left: auto !important;
+        padding: 0 !important;
     }
-    div[data-testid="stButton"].st-key-btn_refresh_domestic_indices > button,
-    div[data-testid="stButton"].st-key-btn_refresh_us_market > button,
-    .st-key-btn_refresh_domestic_indices button,
-    .st-key-btn_refresh_us_market button {
-        height: 26px !important;
-        min-height: 26px !important;
-        max-height: 26px !important;
-        font-size: 0.72rem !important;
-        padding: 0 10px !important;
-        line-height: 24px !important;
+    .st-key-btn_refresh_domestic_indices div[data-testid="stButton"],
+    .st-key-btn_refresh_us_market div[data-testid="stButton"],
+    div[data-testid="stButton"].st-key-btn_refresh_domestic_indices,
+    div[data-testid="stButton"].st-key-btn_refresh_us_market {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
         width: auto !important;
+        margin: 0 !important;
+        margin-left: auto !important;
+        padding: 0 !important;
+    }
+    .st-key-btn_refresh_domestic_indices button,
+    .st-key-btn_refresh_us_market button,
+    .st-key-btn_refresh_domestic_indices [data-testid="baseButton-secondary"],
+    .st-key-btn_refresh_us_market [data-testid="baseButton-secondary"] {
+        height: 22px !important;
+        min-height: 22px !important;
+        max-height: 22px !important;
+        padding: 0 8px !important;
+        font-size: 0.70rem !important;
+        font-weight: 600 !important;
+        line-height: 20px !important;
+        width: auto !important;
+        min-width: 40px !important;
         border-radius: 4px !important;
-        background: #F8FAFC !important;
+        background: #FFFFFF !important;
         border: 1px solid #CBD5E1 !important;
         color: #475569 !important;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+        margin: 0 !important;
         margin-left: auto !important;
-        float: right !important;
+        cursor: pointer !important;
+        transition: all 0.15s ease !important;
     }
-    div[data-testid="stButton"].st-key-btn_refresh_domestic_indices > button:hover,
-    div[data-testid="stButton"].st-key-btn_refresh_us_market > button:hover,
     .st-key-btn_refresh_domestic_indices button:hover,
-    .st-key-btn_refresh_us_market button:hover {
+    .st-key-btn_refresh_us_market button:hover,
+    .st-key-btn_refresh_domestic_indices [data-testid="baseButton-secondary"]:hover,
+    .st-key-btn_refresh_us_market [data-testid="baseButton-secondary"]:hover {
         background: #F1F5F9 !important;
-        color: #0F172A !important;
         border-color: #94A3B8 !important;
+        color: #0F172A !important;
     }
-    div[data-testid="stButton"].st-key-btn_refresh_domestic_indices button p,
-    div[data-testid="stButton"].st-key-btn_refresh_us_market button p,
     .st-key-btn_refresh_domestic_indices button p,
     .st-key-btn_refresh_us_market button p {
-        font-size: 0.72rem !important;
-        line-height: 24px !important;
+        font-size: 0.70rem !important;
+        font-weight: 600 !important;
         margin: 0 !important;
         padding: 0 !important;
+        line-height: 20px !important;
+        color: inherit !important;
     }
 
     /* Desktop table styling */
@@ -1503,45 +1545,38 @@ st.markdown("""
         }
         div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) {
             display: flex !important;
-            flex-direction: column !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            flex-wrap: nowrap !important;
             gap: 6px !important;
-        }
-        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) > div[data-testid="stColumn"],
-        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) > div[data-testid="column"] {
-            width: 100% !important;
-            flex: 0 0 100% !important;
-            max-width: 100% !important;
-        }
-        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) > div[data-testid="stColumn"]:has(.st-key-btn_refresh_domestic_indices),
-        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) > div[data-testid="stColumn"]:has(.st-key-btn_refresh_us_market),
-        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) > div[data-testid="column"]:has(.st-key-btn_refresh_domestic_indices),
-        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) > div[data-testid="column"]:has(.st-key-btn_refresh_us_market) {
-            display: flex !important;
-            justify-content: flex-end !important;
-            align-items: center !important;
             width: 100% !important;
         }
-        div[data-testid="stButton"].st-key-btn_refresh_domestic_indices,
-        div[data-testid="stButton"].st-key-btn_refresh_us_market,
-        .st-key-btn_refresh_domestic_indices,
-        .st-key-btn_refresh_us_market {
-            display: flex !important;
-            justify-content: flex-end !important;
-            align-items: center !important;
-            width: 100% !important;
-            margin-top: 2px !important;
-            margin-bottom: 4px !important;
-            margin-left: auto !important;
-        }
-        div[data-testid="stButton"].st-key-btn_refresh_domestic_indices button,
-        div[data-testid="stButton"].st-key-btn_refresh_us_market button {
-            height: 26px !important;
-            min-height: 26px !important;
-            max-height: 26px !important;
-            font-size: 11.5px !important;
-            line-height: 24px !important;
-            padding: 0px 8px !important;
+        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) > div[data-testid="stColumn"]:first-child,
+        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) > div[data-testid="column"]:first-child {
+            flex: 1 1 auto !important;
             width: auto !important;
+            min-width: 0 !important;
+            max-width: calc(100% - 46px) !important;
+        }
+        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) > div[data-testid="stColumn"]:last-child,
+        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) > div[data-testid="column"]:last-child {
+            flex: 0 0 auto !important;
+            width: auto !important;
+            margin-left: auto !important;
+            display: flex !important;
+            justify-content: flex-end !important;
+            align-items: center !important;
+        }
+        .st-key-btn_refresh_domestic_indices button,
+        .st-key-btn_refresh_us_market button {
+            height: 22px !important;
+            min-height: 22px !important;
+            max-height: 22px !important;
+            font-size: 11px !important;
+            line-height: 20px !important;
+            padding: 0 6px !important;
+            min-width: 38px !important;
             margin-left: auto !important;
         }
 
@@ -3510,7 +3545,7 @@ def render_domestic_market_ticker_bar():
     title_summary = f"[국내 주요 지수 및 실시간 경보 감시] {summary_text} | {badge_text}"
 
     with st.expander(title_summary, expanded=True):
-        top_c1, top_c2 = st.columns([5.4, 0.6], vertical_alignment="center")
+        top_c1, top_c2 = st.columns([10, 1], vertical_alignment="center")
         with top_c1:
             st.markdown(
                 f'<div class="regime-status-bar">'
@@ -3652,7 +3687,7 @@ def render_us_market_macro_bar():
     )
 
     with st.expander(title_summary, expanded=True):
-        top_c1, top_c2 = st.columns([5.4, 0.6], vertical_alignment="center")
+        top_c1, top_c2 = st.columns([10, 1], vertical_alignment="center")
         with top_c1:
             st.markdown(
                 f'<div class="regime-status-bar">'
