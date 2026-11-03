@@ -1508,75 +1508,116 @@ st.markdown("""
             box-shadow: none !important;
         }
 
-        /* Global Regime & Reference Time: 모바일에서 기준시각을 글로벌 체제 박스 바로 아래로 명확히 배치 */
+        /* Mobile: 질문칸 'Press Enter to submit form' 안내 문구 삭제 */
+        [data-testid="InputInstructions"],
+        div[data-testid="InputInstructions"],
+        span[data-testid="InputInstructions"],
+        div[data-testid="stTextInput"] [data-testid="InputInstructions"],
+        div[data-testid="stForm"] [data-testid="InputInstructions"] {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+            width: 0 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
+        /* Global Regime & Reference Time: 모바일에서 버튼 텍스트 가로 유지 및 배열 보존 */
         .regime-status-bar {
             display: flex !important;
             flex-direction: column !important;
             align-items: flex-start !important;
-            gap: 3px !important;
+            gap: 4px !important;
             min-height: auto !important;
             margin-bottom: 4px !important;
             width: 100% !important;
         }
         .regime-status-bar .regime-badge-container {
-            display: block !important;
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            flex-wrap: wrap !important;
+            gap: 5px !important;
             width: 100% !important;
         }
         .regime-status-bar .regime-badge {
             font-size: 0.72rem !important;
-            padding: 3px 6px !important;
+            padding: 3px 8px !important;
             line-height: 1.35 !important;
-            white-space: normal !important;
+            white-space: nowrap !important;
             word-break: keep-all !important;
-            max-width: 100% !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            border-radius: 4px !important;
             box-sizing: border-box !important;
-            display: inline-block !important;
+            max-width: 100% !important;
         }
         .regime-status-bar .regime-time-container {
-            display: block !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 2px !important;
             width: 100% !important;
         }
         .regime-status-bar .regime-time {
-            font-size: 0.70rem !important;
+            font-size: 0.68rem !important;
             color: #64748B !important;
-            margin-top: 1px !important;
+            margin: 0 !important;
+            line-height: 1.35 !important;
             display: block !important;
-            white-space: nowrap !important;
+            white-space: normal !important;
+            word-break: keep-all !important;
         }
-        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) {
+        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar),
+        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_domestic_indices),
+        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_us_market) {
             display: flex !important;
             flex-direction: row !important;
-            align-items: center !important;
+            align-items: flex-start !important;
             justify-content: space-between !important;
             flex-wrap: nowrap !important;
-            gap: 6px !important;
+            gap: 8px !important;
             width: 100% !important;
         }
         div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) > div[data-testid="stColumn"]:first-child,
-        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) > div[data-testid="column"]:first-child {
+        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) > div[data-testid="column"]:first-child,
+        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_domestic_indices) > div[data-testid="stColumn"]:first-child,
+        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_domestic_indices) > div[data-testid="column"]:first-child,
+        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_us_market) > div[data-testid="stColumn"]:first-child,
+        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_us_market) > div[data-testid="column"]:first-child {
             flex: 1 1 auto !important;
             width: auto !important;
             min-width: 0 !important;
-            max-width: calc(100% - 46px) !important;
+            display: block !important;
         }
         div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) > div[data-testid="stColumn"]:last-child,
-        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) > div[data-testid="column"]:last-child {
+        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.regime-status-bar) > div[data-testid="column"]:last-child,
+        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_domestic_indices) > div[data-testid="stColumn"]:last-child,
+        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_domestic_indices) > div[data-testid="column"]:last-child,
+        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_us_market) > div[data-testid="stColumn"]:last-child,
+        div[data-testid="stExpander"] [data-testid="stHorizontalBlock"]:has(.st-key-btn_refresh_us_market) > div[data-testid="column"]:last-child {
             flex: 0 0 auto !important;
             width: auto !important;
+            min-width: 44px !important;
             margin-left: auto !important;
             display: flex !important;
             justify-content: flex-end !important;
-            align-items: center !important;
+            align-items: flex-start !important;
+            padding-top: 2px !important;
         }
         .st-key-btn_refresh_domestic_indices button,
         .st-key-btn_refresh_us_market button {
-            height: 22px !important;
-            min-height: 22px !important;
-            max-height: 22px !important;
-            font-size: 11px !important;
-            line-height: 20px !important;
-            padding: 0 6px !important;
-            min-width: 38px !important;
+            height: 24px !important;
+            min-height: 24px !important;
+            max-height: 24px !important;
+            font-size: 0.72rem !important;
+            line-height: 22px !important;
+            padding: 0 8px !important;
+            min-width: 42px !important;
+            width: auto !important;
+            border-radius: 4px !important;
             margin-left: auto !important;
         }
 
