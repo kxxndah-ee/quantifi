@@ -1839,18 +1839,37 @@ def is_test_environment() -> bool:
 def check_app_access() -> bool:
     """
     Enforces restricted access gate so only the authorized owner can view or use the dashboard.
-    Supports:
-      1. Session state persistence ('is_authenticated')
-      2. Streamlit secrets ('APP_PASSWORD')
-      3. Environment variable ('APP_PASSWORD')
-      4. Auto-login via query parameter ('?token=...' or '?auth=...')
-      5. Secure logout mechanism
+    Uses st.empty() placeholder container and aggressive CSS to completely eliminate any
+    residual ghost afterimage upon successful authentication.
     """
     if is_test_environment():
         return True
 
+    # Dedicated slot for authentication gate: guarantees 100% clean teardown without afterimage
+    auth_slot = st.empty()
+
     # 1. Already authenticated in current session
     if st.session_state.get("is_authenticated", False):
+        auth_slot.empty()
+        st.markdown(
+            """
+            <style>
+            .login-card-wrapper,
+            div:has(> .login-card-wrapper),
+            div[data-testid="stForm"]:has(input[type="password"]),
+            div[data-testid="stElementContainer"]:has(.login-card-wrapper),
+            div[data-testid="stElementContainer"]:has(input[type="password"]) {
+                display: none !important;
+                height: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                visibility: hidden !important;
+                pointer-events: none !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
         return True
 
     # 2. Retrieve configured master password
@@ -1888,6 +1907,7 @@ def check_app_access() -> bool:
         query_token = params.get("token") or params.get("auth")
         if query_token and str(query_token).strip() == active_pw:
             st.session_state["is_authenticated"] = True
+            auth_slot.empty()
             if "token" in params:
                 del st.query_params["token"]
             if "auth" in params:
@@ -1896,79 +1916,79 @@ def check_app_access() -> bool:
     except Exception:
         pass
 
-    # 4. Render sleek, high-end login gate
-    st.markdown(
-        """
-        <style>
-        .login-card-wrapper {
-            max-width: 440px;
-            margin: 40px auto 16px auto;
-            background: #FFFFFF;
-            border: 1px solid #CBD5E1;
-            border-radius: 12px;
-            padding: 28px 24px 20px 24px;
-            box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
-            text-align: center;
-        }
-        .login-title {
-            font-size: 1.30rem;
-            font-weight: 800;
-            color: #0F172A;
-            letter-spacing: -0.3px;
-            margin-bottom: 4px;
-        }
-        .login-sub {
-            font-size: 0.82rem;
-            color: #64748B;
-            margin-bottom: 20px;
-        }
-        .login-badge {
-            background: #0F172A;
-            color: #FFFFFF;
-            font-weight: 800;
-            font-size: 0.70rem;
-            padding: 2px 8px;
-            border-radius: 4px;
-            display: inline-block;
-            margin-bottom: 12px;
-            letter-spacing: 0.5px;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
-    c1, c2, c3 = st.columns([1, 1.8, 1])
-    with c2:
+    # 4. Render sleek, high-end login gate inside dedicated container
+    with auth_slot.container():
         st.markdown(
             """
-            <div class="login-card-wrapper">
-                <span class="login-badge">RESTRICTED ACCESS</span>
-                <div class="login-title">QUANTIFI SECURITY GATE</div>
-                <div class="login-sub">비공개 퀀트 트레이딩 스크리너 · 인가된 소유자 전용</div>
-            </div>
+            <style>
+            .login-card-wrapper {
+                max-width: 440px;
+                margin: 40px auto 16px auto;
+                background: #FFFFFF;
+                border: 1px solid #CBD5E1;
+                border-radius: 12px;
+                padding: 28px 24px 20px 24px;
+                box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+                text-align: center;
+            }
+            .login-title {
+                font-size: 1.30rem;
+                font-weight: 800;
+                color: #0F172A;
+                letter-spacing: -0.3px;
+                margin-bottom: 4px;
+            }
+            .login-sub {
+                font-size: 0.82rem;
+                color: #64748B;
+                margin-bottom: 20px;
+            }
+            .login-badge {
+                background: #0F172A;
+                color: #FFFFFF;
+                font-weight: 800;
+                font-size: 0.70rem;
+                padding: 2px 8px;
+                border-radius: 4px;
+                display: inline-block;
+                margin-bottom: 12px;
+                letter-spacing: 0.5px;
+            }
+            </style>
             """,
             unsafe_allow_html=True
         )
 
-        with st.form("auth_login_form", clear_on_submit=False):
-            entered_pw = st.text_input(
-                "접속 비밀번호",
-                type="password",
-                placeholder="비밀번호를 입력하세요",
-                key="input_master_pw"
+        c1, c2, c3 = st.columns([1, 1.8, 1])
+        with c2:
+            st.markdown(
+                """
+                <div class="login-card-wrapper">
+                    <span class="login-badge">RESTRICTED ACCESS</span>
+                    <div class="login-title">QUANTIFI SECURITY GATE</div>
+                    <div class="login-sub">비공개 퀀트 트레이딩 스크리너 · 인가된 소유자 전용</div>
+                </div>
+                """,
+                unsafe_allow_html=True
             )
-            submitted = st.form_submit_button("보안 접속", type="primary", use_container_width=True)
 
-            if submitted:
-                if entered_pw and entered_pw.strip() == active_pw:
-                    st.session_state["is_authenticated"] = True
-                    st.toast("인증 성공: QUANTIFI 시스템에 접속합니다.")
-                    st.rerun()
-                else:
-                    st.error("비밀번호가 일치하지 않습니다. 다시 입력해주세요.")
+            with st.form("auth_login_form", clear_on_submit=False):
+                entered_pw = st.text_input(
+                    "접속 비밀번호",
+                    type="password",
+                    placeholder="비밀번호를 입력하세요",
+                    key="input_master_pw"
+                )
+                submitted = st.form_submit_button("보안 접속", type="primary", use_container_width=True)
 
-
+                if submitted:
+                    if entered_pw and entered_pw.strip() == active_pw:
+                        st.session_state["is_authenticated"] = True
+                        auth_slot.empty()
+                        st.toast("인증 성공: QUANTIFI 시스템에 접속합니다.")
+                        st.rerun()
+                    else:
+                        st.error("비밀번호가 일치하지 않습니다. 다시 입력해주세요.")
 
     return False
 
