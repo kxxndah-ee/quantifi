@@ -1898,6 +1898,83 @@ st.markdown("""
         div[data-testid="stHorizontalBlock"]:has(.st-key-sc_view_radio) div[data-baseweb="select"] * {
             font-size: 0.78rem !important;
         }
+
+        /* Mobile: 애널리스트 탭 7대 진단 박스(종합퀀트스코어, 가격전략, 수급/거래량, 기술적지표, 목표가, 리스크, 차트) 폰트 축소 및 가독성 최적화 */
+        .quant-card-grid {
+            gap: 4px !important;
+            margin-bottom: 6px !important;
+        }
+        .quant-diag-box {
+            padding: 5px 4px !important;
+            border-radius: 5px !important;
+            box-sizing: border-box !important;
+            min-width: 0 !important;
+            overflow: hidden !important;
+        }
+
+        /* 4열 박스: 종합퀀트스코어, 가격전략, 수급 및 거래량 폭발력, 기술적지표 */
+        .quant-card-grid-4 .quant-box-title {
+            font-size: 0.58rem !important;
+            line-height: 1.25 !important;
+            letter-spacing: -0.4px !important;
+            white-space: normal !important;
+            word-break: keep-all !important;
+            overflow-wrap: break-word !important;
+        }
+        .quant-card-grid-4 .quant-box-value {
+            font-size: 0.78rem !important;
+            line-height: 1.25 !important;
+            margin: 2px 0 !important;
+            letter-spacing: -0.4px !important;
+            white-space: normal !important;
+            word-break: keep-all !important;
+            overflow-wrap: break-word !important;
+        }
+        .quant-card-grid-4 .quant-box-value span,
+        .quant-card-grid-4 .quant-box-badge {
+            font-size: 0.65rem !important;
+            letter-spacing: -0.3px !important;
+        }
+        .quant-card-grid-4 .quant-box-sub {
+            font-size: 0.54rem !important;
+            line-height: 1.25 !important;
+            letter-spacing: -0.4px !important;
+            white-space: normal !important;
+            word-break: keep-all !important;
+            overflow-wrap: break-word !important;
+        }
+
+        /* 3열 박스: 목표가&손절가, 리스크 팩트체크, 차트 & 지표 진단 */
+        .quant-card-grid-3 .quant-box-title {
+            font-size: 0.65rem !important;
+            line-height: 1.25 !important;
+            letter-spacing: -0.3px !important;
+            white-space: normal !important;
+            word-break: keep-all !important;
+            overflow-wrap: break-word !important;
+        }
+        .quant-card-grid-3 .quant-box-value {
+            font-size: 0.82rem !important;
+            line-height: 1.25 !important;
+            margin: 2px 0 !important;
+            letter-spacing: -0.3px !important;
+            white-space: normal !important;
+            word-break: keep-all !important;
+            overflow-wrap: break-word !important;
+        }
+        .quant-card-grid-3 .quant-box-value span,
+        .quant-card-grid-3 .quant-box-badge {
+            font-size: 0.70rem !important;
+            letter-spacing: -0.3px !important;
+        }
+        .quant-card-grid-3 .quant-box-sub {
+            font-size: 0.56rem !important;
+            line-height: 1.25 !important;
+            letter-spacing: -0.3px !important;
+            white-space: normal !important;
+            word-break: keep-all !important;
+            overflow-wrap: break-word !important;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -3410,26 +3487,26 @@ def render_analyst_factsheet_and_qa_tab():
 
     st.markdown(
         f"""
-        <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-bottom:8px;">
-            <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px;">
-                <div style="font-size:0.75rem; color:#64748B; font-weight:700;">종합 퀀트 스코어</div>
-                <div style="font-size:1.05rem; font-weight:800; color:{score_color}; margin:2px 0;">{score:.1f}점 <span style="font-size:0.8rem; font-weight:600; color:#334155;">({label})</span></div>
-                <div style="font-size:0.72rem; color:#64748B;">신뢰도: {score_conf}</div>
+        <div class="quant-card-grid quant-card-grid-4" style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-bottom:8px;">
+            <div class="quant-diag-box" style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px;">
+                <div class="quant-box-title" style="font-size:0.75rem; color:#64748B; font-weight:700;">종합 퀀트 스코어</div>
+                <div class="quant-box-value" style="font-size:1.05rem; font-weight:800; color:{score_color}; margin:2px 0;">{score:.1f}점 <span class="quant-box-badge" style="font-size:0.8rem; font-weight:600; color:#334155;">({label})</span></div>
+                <div class="quant-box-sub" style="font-size:0.72rem; color:#64748B;">신뢰도: {score_conf}</div>
             </div>
-            <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px;">
-                <div style="font-size:0.75rem; color:#64748B; font-weight:700;">가격 전략 & 손익비</div>
-                <div style="font-size:1.05rem; font-weight:800; color:#0F172A; margin:2px 0;">+{tp_pct:.1f}% <span style="font-size:0.75rem; font-weight:600; color:#DC2626;">/ -{sl_pct:.1f}%</span></div>
-                <div style="font-size:0.72rem; color:#64748B;">목표 {tp_price:,.0f}원 | 손절 {sl_price:,.0f}원 (R/R {rr_ratio:.2f})</div>
+            <div class="quant-diag-box" style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px;">
+                <div class="quant-box-title" style="font-size:0.75rem; color:#64748B; font-weight:700;">가격 전략 & 손익비</div>
+                <div class="quant-box-value" style="font-size:1.05rem; font-weight:800; color:#0F172A; margin:2px 0;">+{tp_pct:.1f}% <span class="quant-box-badge" style="font-size:0.75rem; font-weight:600; color:#DC2626;">/ -{sl_pct:.1f}%</span></div>
+                <div class="quant-box-sub" style="font-size:0.72rem; color:#64748B;">목표 {tp_price:,.0f}원 | 손절 {sl_price:,.0f}원 (R/R {rr_ratio:.2f})</div>
             </div>
-            <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px;">
-                <div style="font-size:0.75rem; color:#64748B; font-weight:700;">수급 및 거래량 폭발력</div>
-                <div style="font-size:1.05rem; font-weight:800; color:#0F172A; margin:2px 0;">전일비 {vol_ratio:.1f}배 <span style="font-size:0.75rem; font-weight:600; color:#2563EB;">({vol_tag})</span></div>
-                <div style="font-size:0.72rem; color:#64748B;">{volume:,}주 | 약 {est_val_억:,.0f}억원</div>
+            <div class="quant-diag-box" style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px;">
+                <div class="quant-box-title" style="font-size:0.75rem; color:#64748B; font-weight:700;">수급 및 거래량 폭발력</div>
+                <div class="quant-box-value" style="font-size:1.05rem; font-weight:800; color:#0F172A; margin:2px 0;">전일비 {vol_ratio:.1f}배 <span class="quant-box-badge" style="font-size:0.75rem; font-weight:600; color:#2563EB;">({vol_tag})</span></div>
+                <div class="quant-box-sub" style="font-size:0.72rem; color:#64748B;">{volume:,}주 | 약 {est_val_억:,.0f}억원</div>
             </div>
-            <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px;">
-                <div style="font-size:0.75rem; color:#64748B; font-weight:700;">기술적 지표 & 이평선</div>
-                <div style="font-size:1.05rem; font-weight:800; color:#0F172A; margin:2px 0;">RSI {rsi:.1f}pt <span style="font-size:0.75rem; font-weight:600; color:#475569;">({rsi_tag})</span></div>
-                <div style="font-size:0.72rem; color:#64748B;">{ma_status} | BB %b {bb_pct:.2f}</div>
+            <div class="quant-diag-box" style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px;">
+                <div class="quant-box-title" style="font-size:0.75rem; color:#64748B; font-weight:700;">기술적 지표 & 이평선</div>
+                <div class="quant-box-value" style="font-size:1.05rem; font-weight:800; color:#0F172A; margin:2px 0;">RSI {rsi:.1f}pt <span class="quant-box-badge" style="font-size:0.75rem; font-weight:600; color:#475569;">({rsi_tag})</span></div>
+                <div class="quant-box-sub" style="font-size:0.72rem; color:#64748B;">{ma_status} | BB %b {bb_pct:.2f}</div>
             </div>
         </div>
         """,
@@ -3455,21 +3532,21 @@ def render_analyst_factsheet_and_qa_tab():
     trailing_trig = min(2.4, tp_pct * 0.7)
     st.markdown(
         f"""
-        <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:8px;">
-            <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px;">
-                <div style="font-size:0.75rem; color:#64748B; font-weight:700;">목표가 & 손절가</div>
-                <div style="font-size:1.05rem; font-weight:800; color:#DC2626; margin:2px 0;">{tp_price:,.0f}원 <span style="font-size:0.8rem; font-weight:600; color:#2563EB;">/ {sl_price:,.0f}원</span></div>
-                <div style="font-size:0.72rem; color:#64748B;">목표 +{tp_pct:.1f}% · 손절 -{sl_pct:.1f}% · 트레일링 락 +1.8% (+{trailing_trig:.1f}% 시)</div>
+        <div class="quant-card-grid quant-card-grid-3" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:8px;">
+            <div class="quant-diag-box" style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px;">
+                <div class="quant-box-title" style="font-size:0.75rem; color:#64748B; font-weight:700;">목표가 & 손절가</div>
+                <div class="quant-box-value" style="font-size:1.05rem; font-weight:800; color:#DC2626; margin:2px 0;">{tp_price:,.0f}원 <span class="quant-box-badge" style="font-size:0.8rem; font-weight:600; color:#2563EB;">/ {sl_price:,.0f}원</span></div>
+                <div class="quant-box-sub" style="font-size:0.72rem; color:#64748B;">목표 +{tp_pct:.1f}% · 손절 -{sl_pct:.1f}% · 트레일링 락 +1.8% (+{trailing_trig:.1f}% 시)</div>
             </div>
-            <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px;">
-                <div style="font-size:0.75rem; color:#64748B; font-weight:700;">리스크 팩트체크</div>
-                <div style="font-size:1.05rem; font-weight:800; color:#D97706; margin:2px 0;">고점 -2% 주의 <span style="font-size:0.8rem; font-weight:600; color:#DC2626;">([{sector}])</span></div>
-                <div style="font-size:0.72rem; color:#64748B;">시초 갭 차익실현 경계 · 11~13시 호가 공백 주의</div>
+            <div class="quant-diag-box" style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px;">
+                <div class="quant-box-title" style="font-size:0.75rem; color:#64748B; font-weight:700;">리스크 팩트체크</div>
+                <div class="quant-box-value" style="font-size:1.05rem; font-weight:800; color:#D97706; margin:2px 0;">고점 -2% 주의 <span class="quant-box-badge" style="font-size:0.8rem; font-weight:600; color:#DC2626;">([{sector}])</span></div>
+                <div class="quant-box-sub" style="font-size:0.72rem; color:#64748B;">시초 갭 차익실현 경계 · 11~13시 호가 공백 주의</div>
             </div>
-            <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px;">
-                <div style="font-size:0.75rem; color:#64748B; font-weight:700;">차트 & 지표 진단</div>
-                <div style="font-size:1.05rem; font-weight:800; color:#0F172A; margin:2px 0;">{ma_status} <span style="font-size:0.8rem; font-weight:600; color:#2563EB;">(RSI {rsi:.1f}pt)</span></div>
-                <div style="font-size:0.72rem; color:#64748B;">거래량 전일비 {vol_ratio:.1f}배 · {strategy_tag} 통과</div>
+            <div class="quant-diag-box" style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px;">
+                <div class="quant-box-title" style="font-size:0.75rem; color:#64748B; font-weight:700;">차트 & 지표 진단</div>
+                <div class="quant-box-value" style="font-size:1.05rem; font-weight:800; color:#0F172A; margin:2px 0;">{ma_status} <span class="quant-box-badge" style="font-size:0.8rem; font-weight:600; color:#2563EB;">(RSI {rsi:.1f}pt)</span></div>
+                <div class="quant-box-sub" style="font-size:0.72rem; color:#64748B;">거래량 전일비 {vol_ratio:.1f}배 · {strategy_tag} 통과</div>
             </div>
         </div>
         """,
