@@ -2619,6 +2619,23 @@ def _get_cached_decay_info():
     return evaluate_model_decay(expected_ci_lower=50.0)
 
 
+@st.cache_data(ttl=120, show_spinner=False)
+def _get_cached_diary_history(limit=50):
+    return get_diary_history(limit=limit)
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def _get_cached_watchlist_options():
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT code, name FROM watchlist ORDER BY name ASC")
+            opts = [f"{r['name']} ({r['code']})" for r in cursor.fetchall()]
+        return opts if opts else ["삼성전자 (005930)", "SK하이닉스 (000660)"]
+    except Exception:
+        return ["삼성전자 (005930)", "SK하이닉스 (000660)"]
+
+
 @st.cache_data(ttl=300, show_spinner=False)
 def _get_cached_weekly_res(limit_days=5):
     return get_weekly_verification_summary(limit_days=limit_days)
@@ -5709,12 +5726,7 @@ def render_walk_forward_section():
     bt_c1, bt_c2, bt_c3, bt_c4, bt_c5 = st.columns([2.5, 2.2, 1.8, 1.5, 1.5])
     with bt_c1:
         # Pre-populate with watchlist codes or direct input
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT code, name FROM watchlist ORDER BY name ASC")
-            wl_opts = [f"{r['name']} ({r['code']})" for r in cursor.fetchall()]
-        if not wl_opts:
-            wl_opts = ["삼성전자 (005930)", "SK하이닉스 (000660)"]
+        wl_opts = _get_cached_watchlist_options()
 
         # If a stock was selected from Tab 1 inspector
         target_override = st.session_state.get("target_backtest_code")
@@ -5906,7 +5918,7 @@ def render_prediction_diary_section():
     st.caption("매일 15:40 마감 후 생성된 예측 건과 익일 실제 체결 시세(시/고/저/종)를 일대일 대조하여 모델 열화(Model Decay)를 실시간 감지합니다.")
 
     # 1. Model Decay Status Card
-    decay_info = evaluate_model_decay(expected_ci_lower=50.0)
+    decay_info = _get_cached_decay_info()
     
     col_dec1, col_dec2 = st.columns([1.2, 3])
     with col_dec1:
@@ -5930,11 +5942,13 @@ def render_prediction_diary_section():
         if st.button("전일 예측 즉시 정산", use_container_width=True):
             with st.spinner("미정산 예측 건 시세 조회 및 정산 처리 중..."):
                 settled = settle_pending_predictions()
+                _get_cached_decay_info.clear()
+                _get_cached_diary_history.clear()
                 st.toast(f"{len(settled)}건의 예측이 정산되었습니다.")
                 st.rerun()
 
     # Load Diary History
-    diary_df = get_diary_history(limit=50)
+    diary_df = _get_cached_diary_history(limit=50)
 
     if diary_df.empty:
         st.info("현재 기록된 예측 다이어리가 없습니다. 15:40 마감 배치를 실행하거나 사이드바의 '15:40 마감 배치' 버튼을 눌러보세요.")
@@ -5989,19 +6003,6 @@ def render_prediction_diary_section():
 # =========================================================
 # SUB-MODULE C: 실거래 성과 통합 검증 & AI 자가최적화 (All-in-One)
 # =========================================================
-@st.cache_data(ttl=300, show_spinner=False)
-def _get_cached_meta_opt():
-    return evaluate_multi_horizon_tuning_impact()
-
-
-@st.cache_data(ttl=300, show_spinner=False)
-def _get_cached_decay_info():
-    return evaluate_model_decay(expected_ci_lower=50.0)
-
-
-@st.cache_data(ttl=300, show_spinner=False)
-def _get_cached_weekly_res(limit_days=5):
-    return get_weekly_verification_summary(limit_days=limit_days)
 
 
 @st.cache_data(ttl=600, show_spinner=False)
@@ -6068,38 +6069,30 @@ def render_unified_verification_and_tuning_section():
                     unsafe_allow_html=True
                 )
 
-            def _step_progress(start_p: int, end_p: int, step_delay: float = 0.02):
-                step = 1 if end_p >= start_p else -1
-                for p in range(start_p, end_p + step, step):
-                    _render_btn_pct(p)
-                    time.sleep(step_delay)
-
-            # 1. 0% -> 20%: 미정산 체결 내역 정산
-            _render_btn_pct(0)
-            _step_progress(0, 20, step_delay=0.015)
+            # Milestone 1: 15% (미정산 체결 내역 정산)
+            _render_btn_pct(15)
             settle_pending_predictions()
 
-            # 2. 20% -> 60%: 다주기(전일·주간·1개월) 실거래 성과 검증
-            _step_progress(20, 45, step_delay=0.015)
+            # Milestone 2: 50% (다주기 실거래 성과 검증)
+            _render_btn_pct(50)
             run_weekly_batch_verification(limit_days=5, force_refresh=False)
-            _step_progress(45, 65, step_delay=0.015)
 
-            # 3. 65% -> 90%: 최적화 파라미터 산출 및 스크리너 적용 준비
+            # Milestone 3: 85% (최적화 파라미터 산출 및 스크리너 적용 준비)
+            _render_btn_pct(85)
             _get_cached_meta_opt.clear()
             _get_cached_decay_info.clear()
             _get_cached_weekly_res.clear()
             _get_quick_pit_verification_res.clear()
+            _get_cached_diary_history.clear()
             st.session_state["pending_tuning_updates"] = best_props
             st.session_state["tuning_applied_notification"] = True
             st.session_state["last_master_run_at"] = get_now_kst().strftime("%Y-%m-%d %H:%M:%S")
             st.session_state["last_master_best_horizon"] = best_horizon_lbl
             st.session_state["last_master_best_ret"] = best_ret
             st.session_state["last_master_best_win"] = best_win
-            _step_progress(65, 90, step_delay=0.015)
 
-            # 4. 90% -> 100%: 최종 완료
-            _step_progress(90, 100, step_delay=0.02)
-            time.sleep(0.30)
+            # Milestone 4: 100% (완료)
+            _render_btn_pct(100)
             st.toast(f"검증&최적화 완료! AI 최고 추천 주기({best_horizon_lbl})의 최적 파라미터가 1번 스크리너에 즉시 적용되었습니다.")
             st.rerun()
 

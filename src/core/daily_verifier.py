@@ -369,11 +369,22 @@ def get_weekly_verification_summary(limit_days: int = 5) -> Dict[str, Any]:
         }
 
 
+_POOL_CACHE = {}
+_POOL_CACHE_TS = 0.0
+_PIT_DATA_CACHE: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
+
+
 def get_verification_pool(max_pool_size: int = 250) -> pd.DataFrame:
     """
     Builds a robust verification candidate pool prioritizing user's active watchlist,
     followed by liquid market universe leaders.
     """
+    global _POOL_CACHE, _POOL_CACHE_TS
+    import time
+    now = time.time()
+    if max_pool_size in _POOL_CACHE and (now - _POOL_CACHE_TS) < 300:
+        return _POOL_CACHE[max_pool_size].copy()
+
     wl_recs = []
     try:
         with get_db_connection() as conn:
@@ -398,9 +409,14 @@ def get_verification_pool(max_pool_size: int = 250) -> pd.DataFrame:
         wl_codes = df_wl["code"].tolist()
         df_rest = df_univ[~df_univ["code"].isin(wl_codes)]
         combined = pd.concat([df_wl, df_rest]).head(max_pool_size).reset_index(drop=True)
-        return combined
+        _POOL_CACHE[max_pool_size] = combined
+        _POOL_CACHE_TS = now
+        return combined.copy()
 
-    return df_univ.head(max_pool_size)
+    result = df_univ.head(max_pool_size)
+    _POOL_CACHE[max_pool_size] = result
+    _POOL_CACHE_TS = now
+    return result.copy()
 
 
 def run_daily_point_in_time_verification(
@@ -461,6 +477,8 @@ def run_daily_point_in_time_verification(
             bm_intraday_ret = ((bm_bar["Close"] - bm_bar["Open"]) / bm_bar["Open"]) * 100.0
         bm_day_ret = float(bm_bar.get("Change", 0.0)) * 100.0
 
+    pred_ts = pd.Timestamp(pred_date)
+    exec_ts = pd.Timestamp(exec_date)
     pool = get_verification_pool(max_pool_size=sample_pool_size)
     results = []
 
@@ -470,25 +488,80 @@ def run_daily_point_in_time_verification(
         market = row["market"]
         sector = row.get("sector", "기타")
 
+        cache_key = (code, pred_date, exec_date)
+        stock_data = _PIT_DATA_CACHE.get(cache_key)
+
+        if stock_data is None:
+            try:
+                df = fetch_ohlcv(code, start="2024-01-01", end=exec_date)
+                if df.empty or len(df) < 30:
+                    continue
+
+                if pred_ts not in df.index or exec_ts not in df.index:
+                    continue
+
+                # Point-in-time slice up to pred_date
+                df_pit = df.loc[:pred_date].copy()
+                df_ind = compute_point_in_time_indicators(df_pit)
+                if df_ind.empty:
+                    continue
+
+                t1_row = df_ind.iloc[-1]
+                t1_close = float(t1_row["Close"])
+                t1_val = float(t1_row.get("VolMA20", 1.0) * t1_close)
+
+                score_res = calculate_score_for_row(t1_row)
+                score = float(score_res["score"])
+
+                t_bar = df.loc[exec_date]
+                if isinstance(t_bar, pd.DataFrame):
+                    t_bar = t_bar.iloc[0]
+                t_open = float(t_bar["Open"])
+                t_high = float(t_bar["High"])
+                t_low = float(t_bar["Low"])
+                t_close = float(t_bar["Close"])
+
+                if t_open <= 0 or t1_close <= 0:
+                    continue
+
+                open_gap_pct = ((t_open - t1_close) / t1_close) * 100.0
+
+                stock_data = {
+                    "code": code,
+                    "name": name,
+                    "market": market,
+                    "sector": sector,
+                    "df_pit": df_pit,
+                    "t1_row": t1_row,
+                    "t1_close": t1_close,
+                    "t1_val": t1_val,
+                    "score_res": score_res,
+                    "score": score,
+                    "t_open": t_open,
+                    "t_high": t_high,
+                    "t_low": t_low,
+                    "t_close": t_close,
+                    "open_gap_pct": open_gap_pct,
+                }
+                if len(_PIT_DATA_CACHE) > 1200:
+                    _PIT_DATA_CACHE.clear()
+                _PIT_DATA_CACHE[cache_key] = stock_data
+            except Exception:
+                continue
+
+        df_pit = stock_data["df_pit"]
+        t1_row = stock_data["t1_row"]
+        t1_close = stock_data["t1_close"]
+        t1_val = stock_data["t1_val"]
+        score_res = stock_data["score_res"]
+        score = stock_data["score"]
+        t_open = stock_data["t_open"]
+        t_high = stock_data["t_high"]
+        t_low = stock_data["t_low"]
+        t_close = stock_data["t_close"]
+        open_gap_pct = stock_data["open_gap_pct"]
+
         try:
-            df = fetch_ohlcv(code, start="2024-01-01")
-            if df.empty or len(df) < 30:
-                continue
-
-            dates = [d.strftime("%Y-%m-%d") for d in df.index]
-            if pred_date not in dates or exec_date not in dates:
-                continue
-
-            # Point-in-time slice up to pred_date
-            df_pit = df.loc[:pred_date].copy()
-            df_ind = compute_point_in_time_indicators(df_pit)
-            if df_ind.empty:
-                continue
-
-            t1_row = df_ind.iloc[-1]
-            t1_close = float(t1_row["Close"])
-            t1_val = float(t1_row.get("VolMA20", 1.0) * t1_close)
-
             # Strategy screening at T-1
             is_matched = False
             strat_label = ""
@@ -541,15 +614,12 @@ def run_daily_point_in_time_verification(
                 except Exception:
                     pass
             else:
-                score_res = calculate_score_for_row(t1_row)
-                if score_res["score"] >= score_cutoff and t1_val >= 5_000_000_000:
+                if score >= score_cutoff and t1_val >= 5_000_000_000:
                     is_matched = True
-                    strat_label = f"퀀트 {score_res['score']:.0f}점"
+                    strat_label = f"퀀트 {score:.0f}점"
                     target_tp = score_res.get("tp_pct", 4.0)
                     target_sl = score_res.get("sl_pct", 2.0)
 
-            score_res = calculate_score_for_row(t1_row)
-            score = score_res["score"]
             # Fallback to high conviction: score >= 70 and solid liquidity
             if not is_matched and score >= max(score_cutoff, 70.0) and t1_val >= 5_000_000_000:
                 is_matched = True
@@ -560,17 +630,8 @@ def run_daily_point_in_time_verification(
             if not is_matched:
                 continue
 
-            # Actual performance on exec_date (T)
-            t_row = df.loc[exec_date]
-            t_open = float(t_row["Open"])
-            t_high = float(t_row["High"])
-            t_low = float(t_row["Low"])
-            t_close = float(t_row["Close"])
-
             if t_open <= 0:
                 continue
-
-            open_gap_pct = ((t_open - t1_close) / t1_close) * 100.0
 
             # Exclude extreme gap traps (> +2.8%) and severe gap-downs (< -1.8%)
             if open_gap_pct > 2.8 or open_gap_pct < -1.8:
@@ -1095,38 +1156,96 @@ def evaluate_multi_horizon_tuning_impact() -> Dict[str, Any]:
     }
 
 
-def run_weekly_batch_verification(limit_days: int = 5, force_refresh: bool = True) -> Dict[str, Any]:
+def run_weekly_batch_verification(limit_days: int = 5, force_refresh: bool = False) -> Dict[str, Any]:
     """
     Executes and records daily verifications for the last `limit_days` across all 5 strategies,
     ensuring fresh weekly statistics in SQLite.
     """
     valid_pairs = get_valid_prediction_dates(limit=limit_days)
-    for pred_d, exec_d in valid_pairs:
-        for strat in ALL_VERIF_STRATEGIES:
-            run_daily_point_in_time_verification(
-                pred_date=pred_d,
-                exec_date=exec_d,
-                strategy_mode=strat,
-                sample_pool_size=60,
-                force_refresh=force_refresh
-            )
+    if not valid_pairs:
+        return get_weekly_verification_summary(limit_days=limit_days)
+
+    if not force_refresh:
+        pred_dates = [p[0] for p in valid_pairs]
+        placeholders = ",".join(["?"] * len(pred_dates))
+        existing_pairs = set()
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"SELECT pred_date, strategy_mode FROM daily_verification_history WHERE pred_date IN ({placeholders})",
+                    pred_dates
+                )
+                existing_pairs = {(r["pred_date"], r["strategy_mode"]) for r in cursor.fetchall()}
+        except Exception:
+            pass
+
+        for pred_d, exec_d in valid_pairs:
+            for strat in ALL_VERIF_STRATEGIES:
+                if (pred_d, strat) not in existing_pairs:
+                    run_daily_point_in_time_verification(
+                        pred_date=pred_d,
+                        exec_date=exec_d,
+                        strategy_mode=strat,
+                        sample_pool_size=60,
+                        force_refresh=False
+                    )
+    else:
+        for pred_d, exec_d in valid_pairs:
+            for strat in ALL_VERIF_STRATEGIES:
+                run_daily_point_in_time_verification(
+                    pred_date=pred_d,
+                    exec_date=exec_d,
+                    strategy_mode=strat,
+                    sample_pool_size=60,
+                    force_refresh=True
+                )
     return get_weekly_verification_summary(limit_days=limit_days)
 
 
-def run_monthly_batch_verification(limit_days: int = 25, force_refresh: bool = True) -> pd.DataFrame:
+def run_monthly_batch_verification(limit_days: int = 25, force_refresh: bool = False) -> pd.DataFrame:
     """
     Executes and backfills daily verifications for the last `limit_days` across all 5 strategies,
     ensuring a complete 1-month accumulated dataset in SQLite.
     """
     valid_pairs = get_valid_prediction_dates(limit=limit_days)
-    for pred_d, exec_d in valid_pairs:
-        for strat in ALL_VERIF_STRATEGIES:
-            run_daily_point_in_time_verification(
-                pred_date=pred_d,
-                exec_date=exec_d,
-                strategy_mode=strat,
-                sample_pool_size=40,
-                force_refresh=force_refresh
-            )
+    if not valid_pairs:
+        return get_monthly_verification_summary(limit_days=limit_days)
+
+    if not force_refresh:
+        pred_dates = [p[0] for p in valid_pairs]
+        placeholders = ",".join(["?"] * len(pred_dates))
+        existing_pairs = set()
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"SELECT pred_date, strategy_mode FROM daily_verification_history WHERE pred_date IN ({placeholders})",
+                    pred_dates
+                )
+                existing_pairs = {(r["pred_date"], r["strategy_mode"]) for r in cursor.fetchall()}
+        except Exception:
+            pass
+
+        for pred_d, exec_d in valid_pairs:
+            for strat in ALL_VERIF_STRATEGIES:
+                if (pred_d, strat) not in existing_pairs:
+                    run_daily_point_in_time_verification(
+                        pred_date=pred_d,
+                        exec_date=exec_d,
+                        strategy_mode=strat,
+                        sample_pool_size=40,
+                        force_refresh=False
+                    )
+    else:
+        for pred_d, exec_d in valid_pairs:
+            for strat in ALL_VERIF_STRATEGIES:
+                run_daily_point_in_time_verification(
+                    pred_date=pred_d,
+                    exec_date=exec_d,
+                    strategy_mode=strat,
+                    sample_pool_size=40,
+                    force_refresh=True
+                )
     return get_monthly_verification_summary(limit_days=limit_days)
 
