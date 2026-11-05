@@ -1461,15 +1461,24 @@ def build_stock_quant_snapshot(code: str) -> Dict[str, Any]:
 _UNIVERSE_CACHE: Optional[List[tuple]] = None
 
 _STOCK_ALIASES: Dict[str, tuple] = {
+    "에스케이바이오팜": ("326030", "SK바이오팜"),
+    "sk바이오팜": ("326030", "SK바이오팜"),
+    "SK바이오팜": ("326030", "SK바이오팜"),
+    "에스케이하이닉스": ("000660", "SK하이닉스"),
+    "에스케이텔레콤": ("017670", "SK텔레콤"),
+    "에스케이이노베이션": ("096770", "SK이노베이션"),
+    "에스케이스퀘어": ("402340", "SK스퀘어"),
+    "에스디바이오센서": ("137310", "SD바이오센서"),
+    "케이티": ("030200", "KT"),
+    "케이티앤지": ("033780", "KT&G"),
+    "케이티알파": ("036030", "KT알파"),
     "에이치엘비": ("028300", "HLB"),
     "삼전": ("005930", "삼성전자"),
     "하닉": ("000660", "SK하이닉스"),
     "하이닉스": ("000660", "SK하이닉스"),
-    "에스케이하이닉스": ("000660", "SK하이닉스"),
     "현차": ("005380", "현대차"),
     "네이버": ("035420", "NAVER"),
     "포스코": ("005490", "POSCO홀딩스"),
-    "엘지에너지솔루션": ("373220", "LG에너지솔루션"),
     "엘지에너지솔루션": ("373220", "LG에너지솔루션"),
     "엘지전자": ("066570", "LG전자"),
     "셀트리온제약": ("068760", "셀트리온제약"),
@@ -1498,8 +1507,9 @@ def _load_universe_pairs() -> List[tuple]:
             cur.execute(
                 "SELECT code, name FROM universe WHERE is_active = 1 ORDER BY LENGTH(name) DESC"
             )
+            from src.collectors.krx_universe import normalize_stock_name
             rows = cur.fetchall()
-            _UNIVERSE_CACHE = [(str(r[0]).strip().zfill(6), str(r[1]).strip()) for r in rows if r[0] and r[1]]
+            _UNIVERSE_CACHE = [(str(r[0]).strip().zfill(6), normalize_stock_name(str(r[1]).strip(), str(r[0]).strip())) for r in rows if r[0] and r[1]]
             return _UNIVERSE_CACHE
     except Exception as e:
         logger.warning(f"Failed to load universe cache in quant_analyst: {e}")

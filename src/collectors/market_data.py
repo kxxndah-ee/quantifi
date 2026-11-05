@@ -127,9 +127,16 @@ def fetch_realtime_quotes(codes: list) -> Dict[str, Dict[str, Any]]:
                 local_time = item.get("localTradedAt", "")
                 date_str = local_time[:10] if local_time else now_kst_str
 
+                raw_sname = item.get("stockName", "")
+                try:
+                    from src.collectors.krx_universe import normalize_stock_name
+                    clean_sname = normalize_stock_name(raw_sname, code)
+                except Exception:
+                    clean_sname = raw_sname
+
                 result[code] = {
                     "code": code,
-                    "name": item.get("stockName", ""),
+                    "name": clean_sname,
                     "close": close_p,
                     "open": open_p,
                     "high": high_p,

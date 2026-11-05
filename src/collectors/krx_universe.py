@@ -6,6 +6,7 @@ Stores universe in SQLite data/app.db for fast local querying and screener execu
 
 import io
 import os
+import re
 import json
 import sqlite3
 from datetime import datetime
@@ -75,6 +76,7 @@ def fetch_active_stocks_from_krx() -> pd.DataFrame:
                     df["Industry"] = ""
 
                 result = df[["Code", "Name", "Market", "Sector", "Industry"]].drop_duplicates("Code")
+                result["Name"] = result.apply(lambda r: normalize_stock_name(r["Name"], r["Code"]), axis=1)
                 return result
     except Exception as e:
         print(f"Warning: KIND active stock fetch error: {e}")
@@ -137,7 +139,7 @@ def sync_krx_universe(force: bool = False) -> int:
         if not df_active.empty:
             for _, row in df_active.iterrows():
                 code = str(row["Code"]).zfill(6)
-                name = str(row["Name"])
+                name = normalize_stock_name(str(row["Name"]), code)
                 market = str(row.get("Market", "KOSPI"))
                 sector = str(row.get("Sector", "기타"))
                 industry = str(row.get("Industry", ""))
@@ -147,7 +149,7 @@ def sync_krx_universe(force: bool = False) -> int:
         df_delisted = fetch_historical_delisted_stocks()
         for _, row in df_delisted.iterrows():
             code = str(row["Code"]).zfill(6)
-            name = str(row["Name"])
+            name = normalize_stock_name(str(row["Name"]), code)
             market = str(row["Market"])
             sector = str(row["Sector"])
             industry = str(row["Industry"])
@@ -173,6 +175,75 @@ def sync_krx_universe(force: bool = False) -> int:
         total = cursor.fetchone()[0]
         print(f"KRX Universe synchronized: {total} stocks.")
         return total
+
+
+CANONICAL_NAME_OVERRIDES: Dict[str, str] = {
+    "326030": "SK바이오팜",
+    "030200": "KT",
+    "033780": "KT&G",
+    "036030": "KT알파",
+    "053210": "KT스카이라이프",
+    "058850": "KTcs",
+    "058860": "KTis",
+    "137310": "SD바이오센서",
+    "001620": "KBI동국실업",
+    "053050": "GSE",
+    "010580": "SM벡셀",
+    "460870": "SMCG",
+}
+
+
+def normalize_stock_name(name: str, code: str = "") -> str:
+    """
+    Normalizes Korean legal entity names from KRX KIND / corporate registries
+    into clean, standard Korean stock market trading brand names.
+    (e.g., '에스케이바이오팜' -> 'SK바이오팜', '케이티' -> 'KT', '케이티앤지' -> 'KT&G')
+    """
+    if not name:
+        return ""
+    clean_name = str(name).strip()
+    clean_code = str(code).strip().zfill(6) if code else ""
+
+    # Strip (주) or 주식회사
+    clean_name = re.sub(r"^\(주\)\s*|\s*\(주\)$", "", clean_name).strip()
+    clean_name = re.sub(r"^주식회사\s*|\s*주식회사$", "", clean_name).strip()
+
+    if clean_code in CANONICAL_NAME_OVERRIDES:
+        return CANONICAL_NAME_OVERRIDES[clean_code]
+
+    # Pattern-based canonical brand abbreviations
+    if clean_name.startswith("에스케이"):
+        return "SK" + clean_name[4:]
+    elif clean_name.startswith("엘지"):
+        return "LG" + clean_name[2:]
+    elif clean_name == "케이티앤지":
+        return "KT&G"
+    elif clean_name == "케이티":
+        return "KT"
+    elif clean_name.startswith("케이티") and any(k in clean_name for k in ["알파", "스카이", "cs", "is", "씨에스", "아이엔"]):
+        return "KT" + clean_name[3:]
+    elif clean_name.startswith("씨제이"):
+        return "CJ" + clean_name[3:]
+    elif clean_name.startswith("케이비아이"):
+        return "KBI" + clean_name[5:]
+    elif clean_name.startswith("케이비") and any(k in clean_name for k in ["금융", "증권", "손해", "캐피탈", "스팩"]):
+        return "KB" + clean_name[3:]
+    elif clean_name.startswith("에이치디"):
+        return "HD" + clean_name[4:]
+    elif clean_name.startswith("에이치엘비"):
+        return "HLB" + clean_name[5:]
+    elif clean_name.startswith("엔에이치") and any(k in clean_name for k in ["스팩", "증권", "금융", "투자"]):
+        return "NH" + clean_name[4:]
+    elif clean_name.startswith("비엔케이"):
+        return "BNK" + clean_name[4:]
+    elif clean_name.startswith("디지비"):
+        return "DGB" + clean_name[3:]
+    elif clean_name.startswith("제이비"):
+        return "JB" + clean_name[3:]
+    elif clean_name.startswith("디비") and any(k in clean_name for k in ["스팩", "금융", "손해", "하이텍", "증권"]):
+        return "DB" + clean_name[2:]
+
+    return clean_name
 
 
 def normalize_sector(krx_sec: str, name: str = "", industry: str = "") -> str:
@@ -270,6 +341,7 @@ def get_universe(market: Optional[str] = None, active_only: bool = True) -> pd.D
         query += " ORDER BY market, name"
         df = pd.read_sql_query(query, conn, params=params)
         if not df.empty:
+            df["name"] = df.apply(lambda r: normalize_stock_name(r["name"], r["code"]), axis=1)
             df["sector"] = df.apply(lambda r: normalize_sector(r["sector"], r["name"], r.get("industry", "")), axis=1)
         return df
 
@@ -277,36 +349,59 @@ def get_universe(market: Optional[str] = None, active_only: bool = True) -> pd.D
 def search_ticker(keyword: str, limit: int = 15) -> List[Dict[str, Any]]:
     """
     Searches for stocks matching ticker code or company name.
+    Supports bidirectional search between Korean transliteration and English brand name
+    (e.g., '에스케이바이오팜' and 'SK바이오팜' both find 'SK바이오팜').
     """
     keyword = keyword.strip()
     if not keyword:
         return []
+
+    norm_kw = normalize_stock_name(keyword)
+    alt_kw = ""
+    if keyword.startswith("SK"):
+        alt_kw = "에스케이" + keyword[2:]
+    elif keyword.startswith("KT"):
+        alt_kw = "케이티" + keyword[2:]
+    elif keyword.startswith("LG"):
+        alt_kw = "엘지" + keyword[2:]
 
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT code, name, market, sector, is_active
             FROM universe
-            WHERE code LIKE ? OR name LIKE ?
+            WHERE code LIKE ? OR name LIKE ? OR name LIKE ? OR (length(?) > 0 AND name LIKE ?)
             ORDER BY 
                 CASE WHEN code = ? THEN 1
-                     WHEN name = ? THEN 2
-                     WHEN name LIKE ? THEN 3
+                     WHEN name = ? OR name = ? THEN 2
+                     WHEN name LIKE ? OR name LIKE ? THEN 3
                      ELSE 4 END,
                 name ASC
             LIMIT ?
-        """, (f"{keyword}%", f"%{keyword}%", keyword, keyword, f"{keyword}%", limit))
+        """, (
+            f"{keyword}%", f"%{keyword}%", f"%{norm_kw}%", alt_kw, f"%{alt_kw}%",
+            keyword, keyword, norm_kw, f"{keyword}%", f"{norm_kw}%", limit
+        ))
         rows = cursor.fetchall()
-        return [dict(row) for row in rows]
+        results = []
+        for row in rows:
+            d = dict(row)
+            d["name"] = normalize_stock_name(d["name"], d["code"])
+            results.append(d)
+        return results
 
 
 def get_stock_metadata(code: str) -> Optional[Dict[str, Any]]:
-    """Returns metadata for a specific stock code."""
+    """Returns metadata for a specific stock code with normalized stock name."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT code, name, market, sector, industry, is_active FROM universe WHERE code = ?", (code,))
         row = cursor.fetchone()
-        return dict(row) if row else None
+        if row:
+            d = dict(row)
+            d["name"] = normalize_stock_name(d["name"], d["code"])
+            return d
+        return None
 
 
 def batch_add_to_watchlist(codes: List[str], group_name: str = "기본그룹") -> int:
@@ -334,7 +429,7 @@ def batch_add_to_watchlist(codes: List[str], group_name: str = "기본그룹") -
         records = []
         for code in clean_codes:
             if code in found:
-                name = found[code]["name"]
+                name = normalize_stock_name(found[code]["name"], code)
                 market = found[code]["market"]
                 sector = normalize_sector(found[code]["sector"], name, found[code].get("industry", ""))
             else:

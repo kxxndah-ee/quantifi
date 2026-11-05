@@ -66,6 +66,7 @@ from src.collectors.krx_universe import (
     get_stock_metadata,
     batch_add_to_watchlist,
     clear_watchlist,
+    normalize_stock_name,
     normalize_sector
 )
 from src.core.scoring import (
@@ -2704,7 +2705,8 @@ def get_stock_factsheet_payload(code: str) -> Dict[str, Any]:
             cursor.execute("SELECT name, market, COALESCE(sector, '기타') as sector, COALESCE(industry, '') as industry FROM universe WHERE code = ?", (clean_code,))
             row = cursor.fetchone()
             if row:
-                name = row["name"]
+                from src.collectors.krx_universe import normalize_stock_name
+                name = normalize_stock_name(row["name"], clean_code)
                 market = row["market"]
                 industry = row["industry"]
                 sector = normalize_sector(row["sector"], name, industry)

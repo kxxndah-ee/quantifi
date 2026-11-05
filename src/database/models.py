@@ -195,6 +195,9 @@ def init_db(db_path: str = DB_PATH) -> None:
                 VALUES (?, ?, ?, ?, ?)
             """, defaults)
 
+        # Ensure canonical stock naming across tables
+        migrate_stock_names(conn)
+
         conn.commit()
 
 
@@ -239,3 +242,52 @@ def get_watchlist_groups(db_path: str = DB_PATH) -> List[str]:
 if __name__ == "__main__":
     init_db()
     print("Database initialized successfully at:", DB_PATH)
+
+
+def migrate_stock_names(conn: Optional[sqlite3.Connection] = None, db_path: str = DB_PATH) -> int:
+    """
+    Normalizes any anomalous stock names in universe, watchlist, and predictions tables.
+    Returns the number of rows updated.
+    """
+    from src.collectors.krx_universe import normalize_stock_name
+    should_close = False
+    if conn is None:
+        conn = get_db_connection(db_path)
+        should_close = True
+
+    updated_count = 0
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT code, name FROM universe")
+        u_rows = cursor.fetchall()
+        for r in u_rows:
+            c_code, c_name = r["code"], r["name"]
+            n_name = normalize_stock_name(c_name, c_code)
+            if n_name != c_name:
+                cursor.execute("UPDATE universe SET name = ? WHERE code = ?", (n_name, c_code))
+                updated_count += 1
+
+        cursor.execute("SELECT code, name FROM watchlist")
+        w_rows = cursor.fetchall()
+        for r in w_rows:
+            c_code, c_name = r["code"], r["name"]
+            n_name = normalize_stock_name(c_name, c_code)
+            if n_name != c_name:
+                cursor.execute("UPDATE watchlist SET name = ? WHERE code = ?", (n_name, c_code))
+                updated_count += 1
+
+        cursor.execute("SELECT id, code, name FROM predictions")
+        p_rows = cursor.fetchall()
+        for r in p_rows:
+            p_id, c_code, c_name = r["id"], r["code"], r["name"]
+            n_name = normalize_stock_name(c_name, c_code)
+            if n_name != c_name:
+                cursor.execute("UPDATE predictions SET name = ? WHERE id = ?", (n_name, p_id))
+                updated_count += 1
+
+        conn.commit()
+    finally:
+        if should_close:
+            conn.close()
+
+    return updated_count
