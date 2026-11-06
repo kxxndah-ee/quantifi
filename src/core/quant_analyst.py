@@ -12,6 +12,7 @@ from typing import Dict, Any, List, Optional
 import requests
 
 from src.collectors.us_market import fetch_us_market_summary, get_sector_macro_note
+from src.collectors.domestic_indices import fetch_domestic_indices_summary
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,15 @@ def generate_quant_expert_answer(
     Automatically detects multi-stock comparative questions (e.g., 'HLB와 삼성전자 중 오후에 상승 가능성이 더 높은 종목은?')
     and complex analytical requests, seamlessly developing on previous conversational context.
     """
+    # 0. Check if this is a market/macro query without an explicit stock
+    if stock_info and (stock_info.get("is_market_macro") or str(stock_info.get("code") or "").upper() == "MARKET"):
+        cat = str(stock_info.get("market_macro_category") or detect_market_macro_intent(question).get("category", "general"))
+        return generate_market_macro_answer(question, category=cat, api_key=api_key, chat_history=chat_history)
+
+    macro_intent = detect_market_macro_intent(question or "")
+    if macro_intent.get("is_market_macro") and not extract_all_stocks_from_query(question or ""):
+        return generate_market_macro_answer(question, category=macro_intent.get("category", "general"), api_key=api_key, chat_history=chat_history)
+
     stocks_list: List[Dict[str, Any]] = []
     if compare_stocks and len(compare_stocks) >= 2:
         stocks_list = list(compare_stocks)
@@ -1492,6 +1502,8 @@ _QUESTION_STOPWORDS = {
     "오전", "오후", "종가", "시초", "장중", "가능", "확률", "비교", "우위", "반등",
     "추격", "눌림", "고점", "저점", "지지", "저항", "평단", "수익", "손실", "업종",
     "섹터", "테마", "대장", "누구", "어디", "모드",
+    "국내", "미국", "한국", "글로벌", "해외", "환율", "금리", "유가", "지수",
+    "선물", "옵션", "경제", "거시", "물가", "공포",
 }
 
 
@@ -1632,6 +1644,7 @@ def extract_stock_and_question_from_query(
             "matched_by": "context",
             "is_stock_only": True,
             "is_comparative": False,
+            "is_market_macro": False,
         }
 
     matched_stocks = extract_all_stocks_from_query(q)
@@ -1647,6 +1660,7 @@ def extract_stock_and_question_from_query(
             "matched_by": "multi",
             "is_stock_only": False,
             "is_comparative": True,
+            "is_market_macro": False,
         }
 
     # Case 2: Exactly 1 stock mentioned
@@ -1674,6 +1688,7 @@ def extract_stock_and_question_from_query(
                 "matched_by": m_by,
                 "is_stock_only": False,
                 "is_comparative": False,
+                "is_market_macro": False,
             }
         return {
             "code": m_code_str,
@@ -1682,6 +1697,7 @@ def extract_stock_and_question_from_query(
             "matched_by": m_by,
             "is_stock_only": True,
             "is_comparative": False,
+            "is_market_macro": False,
         }
 
     # Case 3: General stock recommendation / screening question
@@ -1701,9 +1717,25 @@ def extract_stock_and_question_from_query(
             "matched_by": "recommend",
             "is_stock_only": False,
             "is_comparative": False,
+            "is_market_macro": False,
         }
 
-    # Case 4: Follow-up or general question for current active stock
+    # Case 4: Domestic Market / US Market / Macro Economy Query
+    macro_intent = detect_market_macro_intent(q)
+    if macro_intent.get("is_market_macro"):
+        return {
+            "code": "MARKET",
+            "codes": [],
+            "question": q,
+            "matched_by": "market_macro",
+            "market_macro_category": macro_intent.get("category", "general"),
+            "market_macro_label": macro_intent.get("label", "시장 & 매크로 퀀트 분석"),
+            "is_stock_only": False,
+            "is_comparative": False,
+            "is_market_macro": True,
+        }
+
+    # Case 5: Follow-up or general question for current active stock
     return {
         "code": default_code,
         "codes": [default_code],
@@ -1711,7 +1743,341 @@ def extract_stock_and_question_from_query(
         "matched_by": "context",
         "is_stock_only": False,
         "is_comparative": False,
+        "is_market_macro": False,
     }
 
 
 
+
+
+def detect_market_macro_intent(raw_query: str) -> Dict[str, Any]:
+    """
+    Detects whether a user query is directed at:
+    - Domestic Market ('domestic_market'): KOSPI, KOSDAQ, indices, supply/demand, session flow
+    - US Market ('us_market'): NASDAQ, S&P 500, SOXX, Dow, Wall Street, tech giants
+    - Macro Economy ('macro'): FX / USD-KRW, interest rates, inflation, CPI, oil, VIX, global risks
+    - General Market ('market_general'): overall market sentiment, global market overview
+    """
+    q = (raw_query or "").strip().lower()
+    if not q:
+        return {"is_market_macro": False, "category": "none", "label": ""}
+
+    us_keywords = [
+        "미국증시", "미국 증시", "미국장", "미국 장", "미국시장", "미장", "뉴욕증시", "뉴욕 증시",
+        "월가", "월스트리트", "나스닥", "s&p", "s&p500", "sp500", "다우", "다우존스",
+        "필라델피아 반도체", "필라델피아반도체", "필반", "soxx", "qqq", "spy",
+        "빅테크", "m7", "매그니피센트", "러셀2000", "러셀"
+    ]
+
+    dom_keywords = [
+        "국내장", "국내증시", "국내 증시", "국내시장", "한국장", "한국증시", "한국시장",
+        "코스피", "코스닥", "코스피200", "코스닥150", "선물시장", "선물 지수", "선물지수",
+        "지수 흐름", "지수 전망", "장세", "오늘 장세", "장마감", "오전장", "오후장", "장초반",
+        "시장 수급", "외인 수급", "기관 수급", "증시 분위기", "증시 동향", "시장 분위기",
+        "시장 흐름", "시장 전체", "전체 시장", "오늘 시장", "시장 진단", "장세 진단",
+        "국내 증시 흐름", "지수 왜", "지수 반등", "지수 하락"
+    ]
+
+    macro_keywords = [
+        "거시경제", "거시 경제", "매크로", "macro", "환율", "원달러", "달러 환율", "달러환율",
+        "달러인덱스", "원/달러", "엔화", "위안화", "금리", "기준금리", "연준", "fed", "fomc",
+        "파월", "한국은행", "한은", "금통위", "국채", "국채금리", "10년물", "인플레이션", "인플레",
+        "cpi", "ppi", "pce", "물가", "유가", "wti", "국제유가", "원유", "vix", "공포지수",
+        "변동성지수", "경기침체", "경기 침체", "경기 사이클", "스태그플레이션", "글로벌 리스크",
+        "시장 리스크", "경제 전망", "매크로 환경", "금리 인하", "금리 인상"
+    ]
+
+    general_keywords = [
+        "글로벌 증시", "글로벌 시장", "해외 증시", "전체 시황", "시장 점검", "증시 리포트", "마켓 브리핑"
+    ]
+
+    has_us = any(k in q for k in us_keywords)
+    has_dom = any(k in q for k in dom_keywords)
+    has_macro = any(k in q for k in macro_keywords)
+    has_gen = any(k in q for k in general_keywords)
+
+    if not (has_us or has_dom or has_macro or has_gen):
+        return {"is_market_macro": False, "category": "none", "label": ""}
+
+    if (has_us and has_dom) or (has_dom and has_macro) or (has_us and has_macro) or has_gen:
+        return {
+            "is_market_macro": True,
+            "category": "market_general",
+            "label": "국내·글로벌 증시 & 매크로 종합 분석"
+        }
+    if has_us:
+        return {
+            "is_market_macro": True,
+            "category": "us_market",
+            "label": "미국 증시 퀀트 분석"
+        }
+    if has_dom:
+        return {
+            "is_market_macro": True,
+            "category": "domestic_market",
+            "label": "국내 증시 퀀트 분석"
+        }
+    if has_macro:
+        return {
+            "is_market_macro": True,
+            "category": "macro",
+            "label": "거시경제 & 매크로 리스크 분석"
+        }
+
+    return {"is_market_macro": False, "category": "none", "label": ""}
+
+
+def generate_market_macro_answer(
+    question: str,
+    category: str = "general",
+    api_key: Optional[str] = None,
+    chat_history: Optional[List[Dict[str, str]]] = None
+) -> str:
+    """
+    Generates an expert quantitative market and macro analysis answer.
+    Supports both Gemini GenAI and built-in offline quantitative reasoning.
+    """
+    key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    if not key:
+        try:
+            import streamlit as st
+            key = st.secrets.get("GEMINI_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
+        except Exception:
+            pass
+
+    if key and len(key.strip()) > 10:
+        try:
+            return _call_gemini_market_macro(
+                question,
+                category=category,
+                api_key=key.strip(),
+                chat_history=chat_history
+            )
+        except Exception as e:
+            logger.warning(f"Gemini Market Macro API call failed, falling back to built-in reasoning: {e}")
+            return _built_in_market_macro_reasoning(
+                question,
+                category=category,
+                fallback_notice=True,
+                chat_history=chat_history
+            )
+
+    return _built_in_market_macro_reasoning(
+        question,
+        category=category,
+        chat_history=chat_history
+    )
+
+
+def _call_gemini_market_macro(
+    question: str,
+    category: str,
+    api_key: str,
+    chat_history: Optional[List[Dict[str, str]]] = None
+) -> str:
+    headers = {"Content-Type": "application/json"}
+    models_to_try = ["gemini-2.0-flash", "gemini-1.5-flash"]
+
+    dom_summary = fetch_domestic_indices_summary()
+    us_summary = fetch_us_market_summary()
+
+    dom_items = {it["code"]: it for it in dom_summary.get("items", [])}
+    kospi = dom_items.get("KOSPI", {"close": 2600.0, "change_pct": 0.0})
+    kosdaq = dom_items.get("KOSDAQ", {"close": 750.0, "change_pct": 0.0})
+    kpi200 = dom_items.get("KPI200", {"close": 350.0, "change_pct": 0.0})
+    fut = dom_items.get("FUT", {"close": 350.0, "change_pct": 0.0})
+
+    kospi_c = _safe_to_float(kospi.get("close"), 2600.0)
+    kospi_pct = _safe_to_float(kospi.get("change_pct"), 0.0)
+    kosdaq_c = _safe_to_float(kosdaq.get("close"), 750.0)
+    kosdaq_pct = _safe_to_float(kosdaq.get("change_pct"), 0.0)
+    kpi200_c = _safe_to_float(kpi200.get("close"), 350.0)
+    fut_c = _safe_to_float(fut.get("close"), 350.0)
+
+    nasdaq_pct = _safe_to_float(us_summary.get("nasdaq_pct"), 0.0)
+    sp500_pct = _safe_to_float(us_summary.get("sp500_pct"), 0.0)
+    soxx_pct = _safe_to_float(us_summary.get("soxx_pct"), 0.0)
+    dow_pct = _safe_to_float(us_summary.get("dow_pct"), 0.0)
+    usdkrw = _safe_to_float(us_summary.get("usdkrw_rate"), 1350.0)
+    usdkrw_pct = _safe_to_float(us_summary.get("usdkrw_pct"), 0.0)
+    vix_val = _safe_to_float(us_summary.get("vix_val"), 18.0)
+    vix_pct = _safe_to_float(us_summary.get("vix_pct"), 0.0)
+    regime = str(us_summary.get("regime") or "중립")
+    action_guide = str(us_summary.get("action_guide") or "")
+
+    macro_context = (
+        f"[실시간 국내 증시 지표]\n"
+        f"- 코스피: {kospi_c:,.2f}pt ({kospi_pct:+.2f}%) | 코스닥: {kosdaq_c:,.2f}pt ({kosdaq_pct:+.2f}%)\n"
+        f"- 코스피200: {kpi200_c:,.2f}pt | 연결선물: {fut_c:,.2f}pt (베이시스: {fut_c - kpi200_c:+.2f}pt)\n\n"
+        f"[글로벌 미국 증시 및 핵심 매크로 지표]\n"
+        f"- 나스닥: {nasdaq_pct:+.2f}% | S&P 500: {sp500_pct:+.2f}% | 필라델피아 반도체(SOXX): {soxx_pct:+.2f}% | 다우: {dow_pct:+.2f}%\n"
+        f"- 원/달러 환율: {usdkrw:,.1f}원 ({usdkrw_pct:+.2f}%) | VIX 변동성지수: {vix_val:.1f}p ({vix_pct:+.2f}%)\n"
+        f"- 글로벌 시장 체제: {regime} ({action_guide})\n\n"
+    )
+
+    system_instruction = (
+        "당신은 국내 및 글로벌 금융 시장 전반을 총괄 분석하는 최고 수준의 '수석 거시경제 및 퀀트 마켓 스트래티지스트(Chief Global Macro & Market Strategist)'입니다.\n"
+        "특정 종목에 편향되지 않고, 사용자가 질의한 국내 증시(코스피/코스닥/선물/수급), 미국 증시(나스닥/S&P500/SOXX/다우), 거시경제 매크로(환율/금리/인플레이션/유가/VIX)에 대하여 "
+        "제공된 실시간 시장 수치를 바탕으로 객관적이고 논리적인 고품격 분석 리포트를 한국어로 제공하세요.\n"
+        "[답변 원칙 (최우선)]: 질문에 대해 지표만 나열하지 말고, 반드시 답변 맨 첫 줄에 '> **[수석 스트래티지스트 핵심 직답]**: ...' 형식으로 "
+        "사용자가 질문한 핵심(예: 오늘 국내장 진단, 코스피/코스닥 방향성, 미국 증시 파급 효과, 환율/금리 리스크 등)에 대한 명쾌하고 단정적인 결론을 1~2문장으로 즉시 직접 답변한 뒤, "
+        "그 아래에 1. 실시간 국내 및 글로벌 핵심 마켓 지표 진단, 2. 시장 수급 및 매크로 리스크 팩트체크, 3. 섹터별 영향도 및 퀀트 포트폴리오 대응 전략 순서로 상세히 서술하십시오.\n"
+        "모호한 표현 대신 구체적인 지수 포인트, 등락률(%), 환율 수치를 인용하고, 권장 현금 비중과 분할 매매 원칙을 함께 안내하세요."
+    )
+
+    hist_text = ""
+    if chat_history and len(chat_history) > 0:
+        recent_turns = chat_history[-3:]
+        h_lines = []
+        for h in recent_turns:
+            q_txt = str(h.get("q", "")).strip()
+            a_txt = str(h.get("ans", "")).strip()
+            if len(a_txt) > 250:
+                a_txt = a_txt[:250] + "..."
+            if q_txt:
+                h_lines.append(f"Q: {q_txt}\nA: {a_txt}")
+        if h_lines:
+            hist_text = "[이전 대화 맥락]:\n" + "\n\n".join(h_lines) + "\n\n"
+
+    prompt_content = (
+        f"{system_instruction}\n\n{macro_context}\n\n"
+        f"{hist_text}[사용자 질문]: {question}\n\n"
+        "[필수 작성 형식]: 반드시 답변 맨 첫 줄에 '> **[수석 스트래티지스트 핵심 직답]**: [사용자의 핵심 질문에 대한 명확한 결론 직답 1~2문장]'을 작성하고, 그 아래에 구체적인 퀀트 수치 근거와 매매 전략을 서술하십시오."
+    )
+
+    payload = {
+        "contents": [{"parts": [{"text": prompt_content}]}],
+        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1200}
+    }
+
+    last_error_text = ""
+    for model_name in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=12)
+            if resp.status_code == 200:
+                data = resp.json()
+                candidates = data.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    if parts:
+                        return parts[0].get("text", "").strip()
+            last_error_text = f"status {resp.status_code}: {resp.text[:200]}"
+        except Exception as e:
+            last_error_text = str(e)
+            continue
+
+    raise RuntimeError(f"Gemini Market Macro API failed: {last_error_text}")
+
+
+def _built_in_market_macro_reasoning(
+    question: str,
+    category: str = "general",
+    fallback_notice: bool = False,
+    chat_history: Optional[List[Dict[str, str]]] = None
+) -> str:
+    """
+    Offline statistical & rule-based market macro engine.
+    Produces comprehensive, fact-grounded quantitative analysis of domestic and US markets
+    and macroeconomic factors without referencing any specific single stock.
+    """
+    dom_summary = fetch_domestic_indices_summary()
+    us_summary = fetch_us_market_summary()
+
+    dom_items = {it["code"]: it for it in dom_summary.get("items", [])}
+    kospi = dom_items.get("KOSPI", {"close": 2600.0, "change_pct": 0.0, "change": 0.0})
+    kosdaq = dom_items.get("KOSDAQ", {"close": 750.0, "change_pct": 0.0, "change": 0.0})
+    kpi200 = dom_items.get("KPI200", {"close": 350.0, "change_pct": 0.0, "change": 0.0})
+    fut = dom_items.get("FUT", {"close": 350.0, "change_pct": 0.0, "change": 0.0})
+
+    kospi_c = _safe_to_float(kospi.get("close"), 2600.0)
+    kospi_pct = _safe_to_float(kospi.get("change_pct"), 0.0)
+    kosdaq_c = _safe_to_float(kosdaq.get("close"), 750.0)
+    kosdaq_pct = _safe_to_float(kosdaq.get("change_pct"), 0.0)
+    kpi200_c = _safe_to_float(kpi200.get("close"), 350.0)
+    fut_c = _safe_to_float(fut.get("close"), 350.0)
+    basis = fut_c - kpi200_c
+
+    nasdaq_pct = _safe_to_float(us_summary.get("nasdaq_pct"), 0.0)
+    sp500_pct = _safe_to_float(us_summary.get("sp500_pct"), 0.0)
+    soxx_pct = _safe_to_float(us_summary.get("soxx_pct"), 0.0)
+    dow_pct = _safe_to_float(us_summary.get("dow_pct"), 0.0)
+    usdkrw = _safe_to_float(us_summary.get("usdkrw_rate"), 1350.0)
+    usdkrw_pct = _safe_to_float(us_summary.get("usdkrw_pct"), 0.0)
+    vix_val = _safe_to_float(us_summary.get("vix_val"), 18.0)
+    vix_pct = _safe_to_float(us_summary.get("vix_pct"), 0.0)
+    regime = str(us_summary.get("regime") or "중립")
+    action_guide = str(us_summary.get("action_guide") or "시장 수급 및 리스크 요인 확인 후 분할 매매가 유리합니다.")
+
+    q_low = question.lower()
+    if category == "domestic_market" or any(w in q_low for w in ["국내", "코스피", "코스닥", "선물", "장세"]):
+        if kospi_pct >= 0.5 and kosdaq_pct >= 0.5:
+            direct_ans = (
+                f"금일 국내 증시는 코스피({kospi_pct:+.2f}%)와 코스닥({kosdaq_pct:+.2f}%)이 동반 상승하며 "
+                f"위험자산 선호 심리가 강화되는 긍정적 흐름을 나타내고 있습니다. "
+                f"원/달러 환율({usdkrw:,.1f}원) 안정 여부와 외국인 패시브 수급 연속성을 확인하며 주도 섹터 중심의 눌림목 매수 대응이 유리합니다."
+            )
+        elif kospi_pct <= -0.5 and kosdaq_pct <= -0.5:
+            direct_ans = (
+                f"금일 국내 증시는 코스피({kospi_pct:+.2f}%)와 코스닥({kosdaq_pct:+.2f}%)이 동반 조정을 받으며 "
+                f"단기 변동성 확대 및 차익 실현 경계 매물이 출회되는 약세 국면입니다. "
+                f"무리한 저점 추격보다는 현금 비중 40% 이상을 유지하며 지지선 확인 후 보수적으로 접근할 것을 권고합니다."
+            )
+        else:
+            direct_ans = (
+                f"금일 국내 증시는 코스피({kospi_pct:+.2f}%)와 코스닥({kosdaq_pct:+.2f}%) 간 등락이 엇갈리며 "
+                f"뚜렷한 지수 모멘텀보다는 개별 실적 및 재료 보유 종목으로 수급이 집중되는 차별화 장세입니다. "
+                f"지수 방향성 추종보다 철저한 가격 메리트와 손익비 중심의 선별적 대응이 필수적입니다."
+            )
+    elif category == "us_market" or any(w in q_low for w in ["미국", "미장", "나스닥", "s&p", "필라델피아", "반도체"]):
+        tech_sentiment = "강세" if soxx_pct >= 0.5 else ("약세" if soxx_pct <= -0.5 else "혼조세")
+        direct_ans = (
+            f"전일 미국 증시는 나스닥({nasdaq_pct:+.2f}%), S&P 500({sp500_pct:+.2f}%), 필라델피아 반도체({soxx_pct:+.2f}%)가 "
+            f"{tech_sentiment}를 기록하며 글로벌 테크 섹터의 투자 심리에 직접적인 파급력을 미치고 있습니다. "
+            f"특히 SOXX 반도체 지수의 향방은 국내 시총 상위 반도체주 및 IT 부품 섹터의 외국인 수급을 좌우할 핵심 지표입니다."
+        )
+    elif category == "macro" or any(w in q_low for w in ["거시", "매크로", "환율", "금리", "인플레", "cpi", "유가", "vix"]):
+        fx_sentiment = "고환율 부담 구간" if usdkrw >= 1350.0 else "환율 안정권"
+        vix_sentiment = "경계 필요" if vix_val >= 20.0 else "안정적"
+        direct_ans = (
+            f"현재 거시경제(Macro) 환경은 원/달러 환율({usdkrw:,.1f}원, {fx_sentiment})과 변동성 VIX({vix_val:.1f}p, {vix_sentiment})가 "
+            f"복합적으로 작용하는 변곡점입니다. 글로벌 통화정책 기조와 국채 금리 추이에 따라 외국인 자금 유출입이 급변할 수 있으므로, "
+            f"매크로 리스크 노출도가 낮은 실적 방어주와 헷지성 포지션을 병행하는 전략이 합리적입니다."
+        )
+    else:
+        direct_ans = (
+            f"금일 국내 및 글로벌 금융 시장은 코스피({kospi_pct:+.2f}%), 나스닥({nasdaq_pct:+.2f}%), 환율({usdkrw:,.1f}원) 전반에서 "
+            f"글로벌 시장 체제 '{regime}' 환경을 반영하고 있습니다. "
+            f"급격한 레버리지 확대보다는 리스크 관리 원칙에 입각한 분할 매매가 유리합니다."
+        )
+
+    basis_desc = "콘탱고 (선물 고평가, 매수 우위)" if basis > 0 else "백워데이션 (선물 저평가, 매도 경계)"
+    vix_desc = "변동성 낮음 (안정 국면)" if vix_val < 18 else ("변동성 확대 (경계 국면)" if vix_val < 25 else "고변동성 (위험 관리)")
+    fx_desc = "원화 강세 (외인 매수 우호)" if usdkrw_pct < -0.3 else ("원화 약세 (외인 매도 압력)" if usdkrw_pct > 0.3 else "중립 박스권")
+
+    body_parts = [
+        f"> **[수석 스트래티지스트 핵심 직답]**: {direct_ans}\n",
+        "### 1. 실시간 국내 및 글로벌 핵심 마켓 지표 진단",
+        f"- **국내 지수**: 코스피 **{kospi_c:,.2f}pt** ({kospi_pct:+.2f}%) | 코스닥 **{kosdaq_c:,.2f}pt** ({kosdaq_pct:+.2f}%)",
+        f"- **선물 및 파생**: 코스피200 {kpi200_c:,.2f}pt | 연결선물 {fut_c:,.2f}pt (베이시스: {basis:+.2f}pt, {basis_desc})",
+        f"- **미국 3대 지수 & 반도체**: 나스닥 **{nasdaq_pct:+.2f}%** | S&P 500 **{sp500_pct:+.2f}%** | 필라델피아 반도체(SOXX) **{soxx_pct:+.2f}%** | 다우 {dow_pct:+.2f}%",
+        f"- **핵심 매크로**: 원/달러 환율 **{usdkrw:,.1f}원** ({usdkrw_pct:+.2f}%, {fx_desc}) | VIX 변동성지수 **{vix_val:.1f}p** ({vix_desc})",
+        f"- **글로벌 시장 체제**: **{regime}** (가이드: {action_guide})\n",
+        "### 2. 시장 수급 및 매크로 리스크 팩트체크",
+        f"1. **환율 및 외국인 수급 경로**:",
+        f"   - 현재 원/달러 환율 {usdkrw:,.1f}원 수준은 외국인 투자자 관점에서 환차손익 민감도를 자극하는 레벨입니다.",
+        f"   - {'환율 상승 압력으로 인해 코스피 대형 수출주에 대한 외인 패시브 매도 물량이 출회될 수 있어 장중 수급을 면밀히 관찰해야 합니다.' if usdkrw >= 1350 else '환율이 안정권에 위치하여 외인 자금의 급격한 이탈 우려는 제한적이며, 수급 수혜주 중심의 반등 탄력이 기대됩니다.'}",
+        f"2. **금리 및 글로벌 통화정책 파급 효과**:",
+        f"   - 미국 연준(FOMC)의 통화정책 기조와 국채 금리 움직임은 국내 성장주(바이오, 2차전지, 플랫폼) 밸류에이션에 즉각적인 영향을 미칩니다.",
+        f"   - 금리 동결 또는 인하 기대감이 유지될 경우 테크 및 성장 테마의 반등 폭이 커지며, 금리 반등 시에는 가치주 및 배당주로 방어적 수급이 이동합니다.",
+        f"3. **시장 변동성(VIX) 및 하방 지지선 점검**:",
+        f"   - VIX {vix_val:.1f}p 레벨은 {vix_desc} 상태를 가리키며, 글로벌 돌발 악재 발생 시 지수 하방 지지선(코스피 기준 {kospi_c * 0.98:,.0f} ~ {kospi_c * 0.96:,.0f}pt) 이탈 여부를 주시해야 합니다.\n",
+        "### 3. 섹터별 영향도 및 퀀트 포트폴리오 대응 전략",
+        f"- **상대적 강세/수혜 섹터**: {'반도체, AI 테크, 수출 대형주 (미 테크주 훈풍)' if soxx_pct >= 0.0 else '방어주(통신, 음식료), 배당주, 금융주 (지수 방어적 성격)'}",
+        f"- **상대적 경계/조정 섹터**: {'원자재 의존주, 고부채 기업, 환율 민감 내수주' if usdkrw >= 1350 else '단기 과열 테마주, 신용 잔고율 높은 소형주'}",
+        f"- **권장 포트폴리오 비중**: {'주식 60% / 현금 40% (선별적 눌림목 매수)' if regime == '중립' else ('주식 75% / 현금 25% (주도주 추세 추종)' if '강세' in regime else '주식 40% / 현금 60% (보수적 리스크 관리)')}",
+        f"- **체결 원칙**: 시장 지수 변동성이 큰 국면에서는 시초가 추격 매수를 엄격히 금지하며, 장중 1시 이후 분할 진입 및 원칙 손절선을 준수해야 합니다."
+    ]
+
+    notice = "\n\n*(자체 내장 퀀트 매크로 분석 엔진이 실시간 시장 데이터를 집계하여 산출한 정밀 리포트입니다.)*" if fallback_notice else ""
+    return "\n".join(body_parts) + notice

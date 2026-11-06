@@ -98,7 +98,9 @@ from src.core.quant_analyst import (
     generate_quant_expert_answer,
     extract_stock_and_question_from_query,
     extract_all_stocks_from_query,
-    _compute_complex_quant_metrics
+    _compute_complex_quant_metrics,
+    generate_market_macro_answer,
+    detect_market_macro_intent
 )
 try:
     from src.automation.scheduler import (
@@ -3153,6 +3155,208 @@ def _strip_redundant_qa_headers(ans_text: str) -> str:
     return body_text
 
 
+def render_market_macro_qa_view():
+    """
+    Renders dedicated Market & Macro Q&A View:
+    1. Active Market / Macro Answer & history
+    2. Interactive Live Market & Macro Indicators Dashboard
+    3. Quick Market / US / Macro Question Action Buttons
+    """
+    from src.collectors.domestic_indices import fetch_domestic_indices_summary
+    from src.collectors.us_market import fetch_us_market_summary
+
+    prompt = st.session_state.get("qa_market_prompt", "오늘 국내 및 글로벌 증시 흐름 분석")
+    label = st.session_state.get("qa_market_label", "국내·글로벌 증시 & 매크로 종합 분석")
+    cat = st.session_state.get("qa_market_category", "general")
+    ans = st.session_state.get("qa_active_ans_market", "")
+
+    if "qa_hist_market" not in st.session_state:
+        st.session_state["qa_hist_market"] = []
+
+    if not ans:
+        with st.spinner("AI 퀀트 수석 애널리스트가 국내·미국 증시 및 거시경제 지표를 정밀 분석 중입니다..."):
+            try:
+                ans = generate_market_macro_answer(
+                    prompt,
+                    category=cat,
+                    chat_history=st.session_state["qa_hist_market"]
+                )
+            except Exception as _e:
+                ans = f"분석 리포트 생성 중 오류가 발생했습니다: {_e}"
+            st.session_state["qa_active_ans_market"] = ans
+            if not st.session_state["qa_hist_market"]:
+                st.session_state["qa_hist_market"].append({"q": prompt, "ans": ans})
+
+    # STEP 2: Display Market/Macro Answer
+    with st.container(border=True):
+        st.markdown(
+            f"<div style='font-size:0.85rem; font-weight:700; color:#1E293B; background:#F8FAFC; padding:6px 12px; border-radius:6px; border:1px solid #CBD5E1; margin:2px 0 8px 0;'>"
+            f"질문: <span style='color:#0284C7;'>[{label}] {prompt}</span>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
+        st.markdown(f"<div class='quant-qa-body-wrap'>\n\n{_strip_redundant_qa_headers(ans)}\n\n</div>", unsafe_allow_html=True)
+
+        if len(st.session_state["qa_hist_market"]) > 0:
+            with st.expander(f"이전 시장/거시경제 질문 기록 ({len(st.session_state['qa_hist_market'])}건)", expanded=False):
+                for h_idx, h in enumerate(reversed(st.session_state["qa_hist_market"])):
+                    st.markdown(f"**[질문] {h['q']}**")
+                    st.markdown(f"<div class='quant-qa-body-wrap'>\n\n{_strip_redundant_qa_headers(h['ans'])}\n\n</div>", unsafe_allow_html=True)
+                    if h_idx < len(st.session_state["qa_hist_market"]) - 1:
+                        st.divider()
+
+    # STEP 3: Live Market & Macro Indicators Board & Quick Action Buttons
+    dom_summary = fetch_domestic_indices_summary()
+    us_summary = fetch_us_market_summary()
+
+    dom_items = {it["code"]: it for it in dom_summary.get("items", [])}
+    kospi = dom_items.get("KOSPI", {"close": 2600.0, "change_pct": 0.0, "change": 0.0})
+    kosdaq = dom_items.get("KOSDAQ", {"close": 750.0, "change_pct": 0.0, "change": 0.0})
+    kpi200 = dom_items.get("KPI200", {"close": 350.0, "change_pct": 0.0, "change": 0.0})
+    fut = dom_items.get("FUT", {"close": 350.0, "change_pct": 0.0, "change": 0.0})
+
+    nasdaq_pct = float(us_summary.get("nasdaq_pct") or 0.0)
+    sp500_pct = float(us_summary.get("sp500_pct") or 0.0)
+    soxx_pct = float(us_summary.get("soxx_pct") or 0.0)
+    dow_pct = float(us_summary.get("dow_pct") or 0.0)
+    usdkrw = float(us_summary.get("usdkrw_rate") or 1350.0)
+    usdkrw_pct = float(us_summary.get("usdkrw_pct") or 0.0)
+    vix_val = float(us_summary.get("vix_val") or 18.0)
+    regime = str(us_summary.get("regime") or "중립")
+
+    with st.container(border=True):
+        dash_hdr_c1, dash_hdr_c2 = st.columns([3.8, 1.2], gap="small")
+        with dash_hdr_c1:
+            st.markdown(
+                f"<div style='display:flex; align-items:center; flex-wrap:wrap; gap:6px; min-height:2rem; line-height:1.2;'>"
+                f"<span style='font-size:0.78rem; background:#E2E8F0; color:#334155; padding:2px 7px; border-radius:4px; font-weight:700;'>MARKET</span>"
+                f"<span style='font-size:1.15rem; font-weight:800; color:#0F172A; margin-left:2px;'>실시간 국내·미국 증시 & 매크로 지표 보드</span>"
+                f"<span style='font-size:0.80rem; color:#0284C7; font-weight:600; margin-left:6px;'>글로벌 체제: {regime}</span>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+        with dash_hdr_c2:
+            if st.button("개별 종목 분석으로 전환", key="btn_return_stock_view", use_container_width=True):
+                st.session_state["qa_view_mode"] = "stock"
+                st.rerun()
+
+        # Quick market query buttons
+        q_cols = st.columns(4, gap="small")
+        btn_defs = [
+            ("국내장 브리핑", "오늘 국내장 코스피/코스닥 시장 흐름과 외인/기관 수급 특징을 정밀 분석해줘.", "domestic_market", "국내 증시 퀀트 분석"),
+            ("미국증시 브리핑", "전일 미국 증시(나스닥, S&P 500, 반도체) 동향과 국내 증시 파급 효과를 분석해줘.", "us_market", "미국 증시 퀀트 분석"),
+            ("거시경제 & 환율/금리", "현재 원/달러 환율과 글로벌 금리, 인플레이션 매크로 환경 및 리스크를 진단해줘.", "macro", "거시경제 & 매크로 분석"),
+            ("시장 리스크 & 대응전략", "현재 시장의 핵심 위험 요인과 권장 포트폴리오 현금 비중 및 대응 가이드를 제시해줘.", "market_general", "시장 리스크 & 대응 전략"),
+        ]
+
+        for b_idx, (b_title, b_prompt, b_cat, b_lbl) in enumerate(btn_defs):
+            with q_cols[b_idx]:
+                is_active = (prompt == b_prompt)
+                if st.button(b_title, key=f"btn_quick_market_{b_idx}", type="primary" if is_active else "secondary", use_container_width=True):
+                    with st.spinner("AI 퀀트 수석 애널리스트가 실시간 시장 지표를 분석 중입니다..."):
+                        new_ans = generate_market_macro_answer(
+                            b_prompt,
+                            category=b_cat,
+                            chat_history=st.session_state["qa_hist_market"]
+                        )
+                    st.session_state["qa_market_prompt"] = b_prompt
+                    st.session_state["qa_market_label"] = b_lbl
+                    st.session_state["qa_market_category"] = b_cat
+                    st.session_state["qa_active_ans_market"] = new_ans
+                    st.session_state["qa_hist_market"].append({"q": b_prompt, "ans": new_ans})
+                    st.rerun()
+
+        def _fmt_color(pct):
+            return "#DC2626" if pct > 0 else ("#2563EB" if pct < 0 else "#475569")
+
+        def _fmt_sign(pct):
+            return "+" if pct > 0 else ""
+
+        k_pct = float(kospi.get("change_pct") or 0.0)
+        kq_pct = float(kosdaq.get("change_pct") or 0.0)
+        kp2_pct = float(kpi200.get("change_pct") or 0.0)
+        fut_pct = float(fut.get("change_pct") or 0.0)
+
+        # 4 cards row 1 (Domestic)
+        c1, c2, c3, c4 = st.columns(4, gap="small")
+        with c1:
+            st.markdown(
+                f"<div style='background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 10px; text-align:center;'>"
+                f"<div style='font-size:0.75rem; color:#64748B; font-weight:700;'>코스피 (KOSPI)</div>"
+                f"<div style='font-size:1.05rem; font-weight:800; color:{_fmt_color(k_pct)}; margin-top:2px;'>{float(kospi.get('close') or 0):,.2f}</div>"
+                f"<div style='font-size:0.75rem; font-weight:700; color:{_fmt_color(k_pct)};'>{_fmt_sign(k_pct)}{k_pct:.2f}%</div>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+        with c2:
+            st.markdown(
+                f"<div style='background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 10px; text-align:center;'>"
+                f"<div style='font-size:0.75rem; color:#64748B; font-weight:700;'>코스닥 (KOSDAQ)</div>"
+                f"<div style='font-size:1.05rem; font-weight:800; color:{_fmt_color(kq_pct)}; margin-top:2px;'>{float(kosdaq.get('close') or 0):,.2f}</div>"
+                f"<div style='font-size:0.75rem; font-weight:700; color:{_fmt_color(kq_pct)};'>{_fmt_sign(kq_pct)}{kq_pct:.2f}%</div>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+        with c3:
+            st.markdown(
+                f"<div style='background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 10px; text-align:center;'>"
+                f"<div style='font-size:0.75rem; color:#64748B; font-weight:700;'>코스피200</div>"
+                f"<div style='font-size:1.05rem; font-weight:800; color:{_fmt_color(kp2_pct)}; margin-top:2px;'>{float(kpi200.get('close') or 0):,.2f}</div>"
+                f"<div style='font-size:0.75rem; font-weight:700; color:{_fmt_color(kp2_pct)};'>{_fmt_sign(kp2_pct)}{kp2_pct:.2f}%</div>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+        with c4:
+            st.markdown(
+                f"<div style='background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 10px; text-align:center;'>"
+                f"<div style='font-size:0.75rem; color:#64748B; font-weight:700;'>연결선물</div>"
+                f"<div style='font-size:1.05rem; font-weight:800; color:{_fmt_color(fut_pct)}; margin-top:2px;'>{float(fut.get('close') or 0):,.2f}</div>"
+                f"<div style='font-size:0.75rem; font-weight:700; color:{_fmt_color(fut_pct)};'>{_fmt_sign(fut_pct)}{fut_pct:.2f}%</div>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+
+        # 4 cards row 2 (US & Macro)
+        u1, u2, u3, u4 = st.columns(4, gap="small")
+        with u1:
+            st.markdown(
+                f"<div style='background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 10px; text-align:center; margin-top:4px;'>"
+                f"<div style='font-size:0.75rem; color:#64748B; font-weight:700;'>나스닥 (NASDAQ)</div>"
+                f"<div style='font-size:1.05rem; font-weight:800; color:{_fmt_color(nasdaq_pct)}; margin-top:2px;'>{_fmt_sign(nasdaq_pct)}{nasdaq_pct:.2f}%</div>"
+                f"<div style='font-size:0.72rem; color:#64748B;'>미국 기술주</div>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+        with u2:
+            st.markdown(
+                f"<div style='background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 10px; text-align:center; margin-top:4px;'>"
+                f"<div style='font-size:0.75rem; color:#64748B; font-weight:700;'>필라델피아 반도체</div>"
+                f"<div style='font-size:1.05rem; font-weight:800; color:{_fmt_color(soxx_pct)}; margin-top:2px;'>{_fmt_sign(soxx_pct)}{soxx_pct:.2f}%</div>"
+                f"<div style='font-size:0.72rem; color:#64748B;'>SOXX ETF</div>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+        with u3:
+            st.markdown(
+                f"<div style='background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 10px; text-align:center; margin-top:4px;'>"
+                f"<div style='font-size:0.75rem; color:#64748B; font-weight:700;'>S&P 500</div>"
+                f"<div style='font-size:1.05rem; font-weight:800; color:{_fmt_color(sp500_pct)}; margin-top:2px;'>{_fmt_sign(sp500_pct)}{sp500_pct:.2f}%</div>"
+                f"<div style='font-size:0.72rem; color:#64748B;'>다우: {_fmt_sign(dow_pct)}{dow_pct:.2f}%</div>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+        with u4:
+            st.markdown(
+                f"<div style='background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 10px; text-align:center; margin-top:4px;'>"
+                f"<div style='font-size:0.75rem; color:#64748B; font-weight:700;'>원/달러 환율</div>"
+                f"<div style='font-size:1.05rem; font-weight:800; color:#0F172A; margin-top:2px;'>{usdkrw:,.1f}원</div>"
+                f"<div style='font-size:0.72rem; font-weight:700; color:{_fmt_color(usdkrw_pct)};'>{_fmt_sign(usdkrw_pct)}{usdkrw_pct:.2f}% (VIX: {vix_val:.1f}p)</div>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+
+
 def render_analyst_factsheet_and_qa_tab():
     # 1. State initialization for selected stock & top screened fallback
     def_top_code = "005930"
@@ -3193,12 +3397,28 @@ def render_analyst_factsheet_and_qa_tab():
         st.session_state[cache_key] = {}
 
     # 2. STEP 1 (TOP): 통합 질문 입력 콘솔 (상단 텍스트 삭제 후 좌측에 컴팩트한 동일 사이즈로 시세 동기화 / 질의 초기화 배치)
+    is_market_mode = (st.session_state.get("qa_view_mode") == "market_macro")
     with st.container(border=True):
         h_c1, h_c2, _h_spacer = st.columns([0.9, 0.9, 4.2], gap="small")
         with h_c1:
             sync_btn = st.button("시세 동기화", key="btn_qa_sync_market", use_container_width=True)
         with h_c2:
             reset_btn = st.button("질의 초기화", key=f"reset_chat_{curr_target_code}_tab2", use_container_width=True)
+        with _h_spacer:
+            if is_market_mode:
+                mode_btn = st.button("개별 종목 분석으로 전환", key="btn_switch_stock_mode")
+                if mode_btn:
+                    st.session_state["qa_view_mode"] = "stock"
+                    st.rerun()
+            else:
+                mode_btn = st.button("국내·미장·매크로 분석", key="btn_switch_market_mode")
+                if mode_btn:
+                    st.session_state["qa_view_mode"] = "market_macro"
+                    st.session_state["qa_market_prompt"] = "오늘 국내 및 글로벌 증시 흐름과 주요 거시경제 특징을 종합 분석해줘."
+                    st.session_state["qa_market_label"] = "국내·글로벌 증시 & 매크로 종합 분석"
+                    st.session_state["qa_market_category"] = "general"
+                    st.session_state.pop("qa_active_ans_market", None)
+                    st.rerun()
 
         if sync_btn:
             st.cache_data.clear()
@@ -3218,6 +3438,8 @@ def render_analyst_factsheet_and_qa_tab():
             st.session_state.pop(qa_active_ans_key, None)
             st.session_state["qa_compared_codes"] = []
             st.session_state["qa_has_active_result"] = True
+            st.session_state["qa_hist_market"] = []
+            st.session_state.pop("qa_active_ans_market", None)
             st.rerun()
 
         with st.form(key=f"qa_custom_form_{curr_target_code}", clear_on_submit=True, border=False):
@@ -3244,6 +3466,32 @@ def render_analyst_factsheet_and_qa_tab():
                 matched_codes = parsed.get("codes", [parsed["code"]])
                 eff_question = parsed["question"]
                 is_stock_only = parsed["is_stock_only"]
+
+                if parsed.get("is_market_macro"):
+                    st.session_state["qa_view_mode"] = "market_macro"
+                    st.session_state["qa_market_prompt"] = c_prompt
+                    st.session_state["qa_market_category"] = parsed.get("market_macro_category", "general")
+                    st.session_state["qa_market_label"] = parsed.get("market_macro_label", "시장 퀀트 분석")
+                    st.session_state["qa_has_active_result"] = True
+
+                    if "qa_hist_market" not in st.session_state:
+                        st.session_state["qa_hist_market"] = []
+
+                    with st.spinner("수석 애널리스트가 국내·미국 증시 및 거시경제 지표를 정밀 분석 중입니다..."):
+                        try:
+                            ans = generate_market_macro_answer(
+                                eff_question,
+                                category=parsed.get("market_macro_category", "general"),
+                                chat_history=st.session_state["qa_hist_market"]
+                            )
+                        except Exception as _e:
+                            ans = f"시장/거시경제 분석 답변 생성 중 오류가 발생했습니다: {_e}"
+
+                    st.session_state["qa_active_ans_market"] = ans
+                    st.session_state["qa_hist_market"].append({"q": c_prompt, "ans": ans})
+                    st.rerun()
+
+                st.session_state["qa_view_mode"] = "stock"
 
                 if len(matched_codes) >= 2:
                     with st.spinner("수석 애널리스트가 복수 종목의 실시간 퀀트 지표를 동시 산출하여 비교 분석 중입니다..."):
@@ -3319,6 +3567,10 @@ def render_analyst_factsheet_and_qa_tab():
                 st.warning("질문 내용을 입력해 주세요.")
 
     if not st.session_state.get("qa_has_active_result", False):
+        return
+
+    if st.session_state.get("qa_view_mode") == "market_macro":
+        render_market_macro_qa_view()
         return
 
     with st.spinner(f"수석 애널리스트가 [{curr_target_code}] 실시간 시세 및 퀀트 지표를 분석 중입니다..."):
