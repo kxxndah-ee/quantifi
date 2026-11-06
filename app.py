@@ -3236,6 +3236,23 @@ def render_market_macro_qa_view():
                 f"</div>",
                 unsafe_allow_html=True
             )
+        from src.collectors.market_alerts import evaluate_market_warning_alerts
+        macro_alert = evaluate_market_warning_alerts(domestic_summary=dom_summary, us_summary=us_summary)
+        if macro_alert.get("level") in ("WARNING", "CRITICAL"):
+            m_trig = macro_alert.get("triggered_time")
+            m_end = macro_alert.get("end_time")
+            m_rem = macro_alert.get("remaining_str", "")
+            m_time_pill = ""
+            if m_trig and m_end:
+                m_time_pill = f'<span style="background:#0F172A; color:#FFFFFF; font-weight:700; font-size:0.70rem; padding:2px 6px; border-radius:3px; margin-left:6px;">발동 {m_trig} · 종료 {m_end}' + (f' ({m_rem})' if m_rem else '') + f'</span>'
+            st.markdown(
+                f'<div style="background:{macro_alert.get("bg_color")}; border:1px solid {macro_alert.get("border_color")}; border-radius:6px; padding:6px 10px; margin:4px 0 8px 0; display:flex; align-items:center; flex-wrap:wrap; gap:6px;">'
+                f'<span style="background:{macro_alert.get("badge_color")}; color:#FFFFFF; font-weight:700; font-size:0.72rem; padding:2px 6px; border-radius:4px;">{macro_alert.get("badge_text")}</span>'
+                f'{m_time_pill}'
+                f'<span style="font-weight:700; font-size:0.80rem; color:{macro_alert.get("text_color")}; margin-left:4px;">{macro_alert.get("summary_text")}</span>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
         with dash_hdr_c2:
             if st.button("개별 종목 분석으로 전환", key="btn_return_stock_view", use_container_width=True):
                 st.session_state["qa_view_mode"] = "stock"
@@ -3932,6 +3949,17 @@ def render_domestic_market_ticker_bar():
             st.toast(f"[실시간 시장 경고] {alert_data.get('title', '')} (10초 자동 감시)")
 
     title_summary = f"[국내 주요 지수 및 실시간 경보 감시] {summary_text} | {badge_text}"
+    if alert_data.get("triggered_time") and alert_data.get("end_time"):
+        title_summary += f" [발동 {alert_data['triggered_time']} · 종료 {alert_data['end_time']}]"
+
+    time_badge_regime = ""
+    if alert_data.get("triggered_time") and alert_data.get("end_time"):
+        rem_txt = f" ({alert_data['remaining_str']})" if alert_data.get("remaining_str") else ""
+        time_badge_regime = (
+            f'<span class="regime-badge" style="background:#1E293B; color:#F8FAFC; font-weight:700; font-size:0.75rem; padding:3px 8px; border-radius:4px; display:inline-block;">'
+            f'발동 {alert_data["triggered_time"]} · 종료 {alert_data["end_time"]}{rem_txt}'
+            f'</span>'
+        )
 
     with st.expander(title_summary, expanded=True):
         top_c1, top_c2 = st.columns([10, 1], vertical_alignment="center")
@@ -3945,6 +3973,7 @@ def render_domestic_market_ticker_bar():
                 f'<span class="regime-badge" style="background:{badge_color}; color:#FFFFFF; font-weight:700; font-size:0.75rem; padding:3px 8px; border-radius:4px; display:inline-block;">'
                 f'{badge_text}'
                 f'</span>'
+                f'{time_badge_regime}'
                 f'</div>'
                 f'<div class="regime-time-container" style="display:inline-flex; align-items:center; gap:8px;">'
                 f'<span class="regime-time" style="color:#64748B; font-size:0.72rem; display:inline-block;">기준시각: {updated_at_str}</span>'
@@ -3964,9 +3993,13 @@ def render_domestic_market_ticker_bar():
             alert_items_pills = []
             for alt in alert_data.get("alerts", []):
                 alt_badge = f'<span style="background:{badge_color}; color:#FFFFFF; font-weight:700; font-size:0.70rem; padding:1px 6px; border-radius:3px; margin-right:4px;">{alt["target"]}</span>'
+                alt_time_pill = ""
+                if alt.get("triggered_time") and alt.get("end_time"):
+                    alt_rem = f" ({alt['remaining_str']})" if alt.get("remaining_str") else ""
+                    alt_time_pill = f'<span style="background:#0F172A; color:#FFFFFF; font-weight:700; font-size:0.68rem; padding:1px 6px; border-radius:3px; margin-right:5px;">발동 {alt["triggered_time"]} · 종료 {alt["end_time"]}{alt_rem}</span>'
                 alert_items_pills.append(
-                    f'<div style="font-size:0.75rem; line-height:1.45; color:#334155; margin-bottom:2px;">'
-                    f'{alt_badge} <strong>{alt["title"]}</strong> : {alt["message"]}'
+                    f'<div style="font-size:0.75rem; line-height:1.5; color:#334155; margin-bottom:3px;">'
+                    f'{alt_badge} {alt_time_pill}<strong>{alt["title"]}</strong> : {alt["message"]}'
                     f'</div>'
                 )
 
@@ -4006,7 +4039,8 @@ def render_domestic_market_ticker_bar():
                 if chg_pct <= -5.0 or chg_pct >= 5.0:
                     card_border = "2px solid #DC2626"
                     card_bg = "#FEF2F2"
-                    card_extra_pill = '<div style="font-size:0.64rem; font-weight:700; color:#DC2626; margin-top:2px;">사이드카 발동</div>'
+                    time_sub = f"<br/>{alert_data['triggered_time']}~{alert_data['end_time']}" if alert_data.get("triggered_time") and alert_data.get("end_time") else ""
+                    card_extra_pill = f'<div style="font-size:0.64rem; font-weight:700; color:#DC2626; margin-top:2px; line-height:1.2;">사이드카 발동{time_sub}</div>'
                 elif chg_pct <= -3.5 or chg_pct >= 3.5:
                     card_border = f"1.5px solid {badge_color}"
                     card_bg = "#FFFBEB"
@@ -4015,7 +4049,8 @@ def render_domestic_market_ticker_bar():
                 if chg_pct <= -6.0 or chg_pct >= 6.0:
                     card_border = "2px solid #DC2626"
                     card_bg = "#FEF2F2"
-                    card_extra_pill = '<div style="font-size:0.64rem; font-weight:700; color:#DC2626; margin-top:2px;">사이드카 발동</div>'
+                    time_sub = f"<br/>{alert_data['triggered_time']}~{alert_data['end_time']}" if alert_data.get("triggered_time") and alert_data.get("end_time") else ""
+                    card_extra_pill = f'<div style="font-size:0.64rem; font-weight:700; color:#DC2626; margin-top:2px; line-height:1.2;">사이드카 발동{time_sub}</div>'
                 elif chg_pct <= -4.5 or chg_pct >= 4.5:
                     card_border = f"1.5px solid {badge_color}"
                     card_bg = "#FFFBEB"
@@ -4024,7 +4059,8 @@ def render_domestic_market_ticker_bar():
                 if chg_pct <= -8.0:
                     card_border = "2px solid #DC2626"
                     card_bg = "#FEF2F2"
-                    card_extra_pill = '<div style="font-size:0.64rem; font-weight:700; color:#DC2626; margin-top:2px;">서킷브레이커 발동</div>'
+                    time_sub = f"<br/>{alert_data['triggered_time']}~{alert_data['end_time']}" if alert_data.get("triggered_time") and alert_data.get("end_time") else ""
+                    card_extra_pill = f'<div style="font-size:0.64rem; font-weight:700; color:#DC2626; margin-top:2px; line-height:1.2;">서킷브레이커 발동{time_sub}</div>'
                 elif chg_pct <= -5.0:
                     card_border = f"1.5px solid {badge_color}"
                     card_bg = "#FFFBEB"
@@ -4195,6 +4231,19 @@ def render_top_realtime_market_alert_banner():
         text_col = alert_data.get("text_color", "#92400E")
         badge_col = alert_data.get("badge_color", "#D97706")
         updated_at = alert_data.get("updated_at_str", "")
+        trig_t = alert_data.get("triggered_time")
+        end_t = alert_data.get("end_time")
+        rem_str = alert_data.get("remaining_str", "")
+
+        time_badge_html = ""
+        if trig_t and end_t:
+            rem_suffix = f" ({rem_str})" if rem_str else ""
+            time_badge_html = (
+                f'<span style="background:#0F172A; color:#F8FAFC; font-weight:700; font-size:0.72rem; '
+                f'padding:2px 7px; border-radius:4px; display:inline-block; letter-spacing:-0.2px;">'
+                f'발동 {trig_t} · 종료 {end_t}{rem_suffix}'
+                f'</span>'
+            )
 
         banner_html = (
             f'<div class="top-realtime-alert-banner" style="background:{bg_col}; border:1px solid {border_col}; border-radius:6px; '
@@ -4202,6 +4251,7 @@ def render_top_realtime_market_alert_banner():
             f'<div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">'
             f'<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">'
             f'<span style="background:{badge_col}; color:#FFFFFF; font-weight:800; font-size:0.75rem; padding:3px 8px; border-radius:4px; display:inline-block;">{badge_text}</span>'
+            f'{time_badge_html}'
             f'<span style="font-weight:700; font-size:0.82rem; color:{text_col};">{summary_text}</span>'
             f'</div>'
             f'<div style="display:flex; align-items:center; gap:8px;">'

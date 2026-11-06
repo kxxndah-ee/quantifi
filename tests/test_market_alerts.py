@@ -8,8 +8,10 @@ from unittest.mock import patch, MagicMock
 
 from src.collectors.market_alerts import (
     evaluate_market_warning_alerts,
-    get_realtime_market_alerts
+    get_realtime_market_alerts,
+    clear_alert_state
 )
+from datetime import datetime, timedelta
 
 
 class TestMarketAlerts(unittest.TestCase):
@@ -109,6 +111,77 @@ class TestMarketAlerts(unittest.TestCase):
         vix_alerts = [a for a in res["alerts"] if a["target_code"] == "VIX"]
         self.assertEqual(len(vix_alerts), 1)
         self.assertIn("VIX 공포지수", vix_alerts[0]["title"])
+
+    def test_sidecar_trigger_and_expiration_timing(self):
+        clear_alert_state()
+        t0 = datetime(2026, 11, 6, 10, 15, 0)
+        domestic_summary = {
+            "items": [
+                {"code": "KOSPI", "name": "코스피", "close": 2400.0, "change_pct": -4.20},
+                {"code": "FUT", "name": "코스피200선물", "close": 320.0, "change_pct": -5.20},
+            ]
+        }
+        res1 = evaluate_market_warning_alerts(domestic_summary=domestic_summary, now_kst=t0)
+        self.assertEqual(res1["level"], "CRITICAL")
+        self.assertIn("사이드카", res1["badge_text"])
+        self.assertEqual(res1["triggered_time"], "10:15:00")
+        self.assertEqual(res1["end_time"], "10:20:00")
+        self.assertIn("5분간 효력 정지", res1["duration_str"])
+        self.assertIn("발동 10:15:00", res1["time_info"])
+        self.assertIn("종료 10:20:00", res1["time_info"])
+
+        # Check alert item
+        alt = res1["alerts"][0]
+        self.assertEqual(alt["triggered_time"], "10:15:00")
+        self.assertEqual(alt["end_time"], "10:20:00")
+        self.assertEqual(alt["duration_minutes"], 5)
+        self.assertIn("발동 10:15:00", alt["title"])
+        self.assertIn("종료 10:20:00", alt["title"])
+
+        # 10 seconds polling later - trigger time must be frozen, countdown updated
+        t1 = t0 + timedelta(seconds=10)
+        res2 = evaluate_market_warning_alerts(domestic_summary=domestic_summary, now_kst=t1)
+        self.assertEqual(res2["triggered_time"], "10:15:00")
+        self.assertEqual(res2["end_time"], "10:20:00")
+        self.assertEqual(res2["remaining_str"], "잔여 4분 50초")
+        self.assertEqual(res2["alert_status"], "발동 중")
+
+        # 5 minutes and 10 seconds later - status should be expired
+        t2 = t0 + timedelta(seconds=310)
+        res3 = evaluate_market_warning_alerts(domestic_summary=domestic_summary, now_kst=t2)
+        self.assertEqual(res3["triggered_time"], "10:15:00")
+        self.assertEqual(res3["end_time"], "10:20:00")
+        self.assertEqual(res3["remaining_str"], "해제 완료")
+        self.assertEqual(res3["alert_status"], "발동 종료 (해제)")
+        clear_alert_state()
+
+    def test_circuit_breaker_timing(self):
+        clear_alert_state()
+        t0 = datetime(2026, 11, 6, 9, 30, 0)
+        domestic_summary = {
+            "items": [
+                {"code": "KOSPI", "name": "코스피", "close": 2350.0, "change_pct": -8.50},
+            ]
+        }
+        res = evaluate_market_warning_alerts(domestic_summary=domestic_summary, now_kst=t0)
+        self.assertEqual(res["level"], "CRITICAL")
+        self.assertEqual(res["triggered_time"], "09:30:00")
+        self.assertEqual(res["end_time"], "09:50:00")
+        self.assertIn("20분간 매매 중단", res["duration_str"])
+        self.assertIn("종료 09:50:00", res["time_info"])
+
+        # CB Stage 3 (Market closed)
+        clear_alert_state()
+        domestic_summary_stage3 = {
+            "items": [
+                {"code": "KOSPI", "name": "코스피", "close": 2000.0, "change_pct": -21.00},
+            ]
+        }
+        res_cb3 = evaluate_market_warning_alerts(domestic_summary=domestic_summary_stage3, now_kst=t0)
+        self.assertEqual(res_cb3["triggered_time"], "09:30:00")
+        self.assertEqual(res_cb3["end_time"], "당일 장 마감")
+        self.assertIn("당일 거래 전면 마감", res_cb3["duration_str"])
+        clear_alert_state()
 
 
 if __name__ == "__main__":

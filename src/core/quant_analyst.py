@@ -1905,10 +1905,17 @@ def _call_gemini_market_macro(
     regime = str(us_summary.get("regime") or "중립")
     action_guide = str(us_summary.get("action_guide") or "")
 
+    from src.collectors.market_alerts import evaluate_market_warning_alerts
+    alert_info = evaluate_market_warning_alerts(domestic_summary=dom_summary, us_summary=us_summary)
+    alert_status_line = f"- 시장 경보 체제: {alert_info.get('badge_text')} ({alert_info.get('level')})"
+    if alert_info.get("triggered_time") and alert_info.get("end_time"):
+        alert_status_line += f" | 발동시각: {alert_info['triggered_time']} · 종료시각: {alert_info['end_time']} ({alert_info.get('remaining_str', '')})"
+
     macro_context = (
         f"[실시간 국내 증시 지표]\n"
         f"- 코스피: {kospi_c:,.2f}pt ({kospi_pct:+.2f}%) | 코스닥: {kosdaq_c:,.2f}pt ({kosdaq_pct:+.2f}%)\n"
-        f"- 코스피200: {kpi200_c:,.2f}pt | 연결선물: {fut_c:,.2f}pt (베이시스: {fut_c - kpi200_c:+.2f}pt)\n\n"
+        f"- 코스피200: {kpi200_c:,.2f}pt | 연결선물: {fut_c:,.2f}pt (베이시스: {fut_c - kpi200_c:+.2f}pt)\n"
+        f"{alert_status_line}\n\n"
         f"[글로벌 미국 증시 및 핵심 매크로 지표]\n"
         f"- 나스닥: {nasdaq_pct:+.2f}% | S&P 500: {sp500_pct:+.2f}% | 필라델피아 반도체(SOXX): {soxx_pct:+.2f}% | 다우: {dow_pct:+.2f}%\n"
         f"- 원/달러 환율: {usdkrw:,.1f}원 ({usdkrw_pct:+.2f}%) | VIX 변동성지수: {vix_val:.1f}p ({vix_pct:+.2f}%)\n"
@@ -2036,6 +2043,26 @@ def _built_in_market_macro_reasoning(
             f"{tech_sentiment}를 기록하며 글로벌 테크 섹터의 투자 심리에 직접적인 파급력을 미치고 있습니다. "
             f"특히 SOXX 반도체 지수의 향방은 국내 시총 상위 반도체주 및 IT 부품 섹터의 외국인 수급을 좌우할 핵심 지표입니다."
         )
+    elif any(w in q_low for w in ["사이드카", "서킷브레이커", "서킷", "발동시간", "종료시간", "시장경보"]):
+        from src.collectors.market_alerts import evaluate_market_warning_alerts
+        alert_info = evaluate_market_warning_alerts(domestic_summary=dom_summary, us_summary=us_summary)
+        level = alert_info.get("level", "NORMAL")
+        if level in ("WARNING", "CRITICAL") and alert_info.get("triggered_time"):
+            trig_t = alert_info.get("triggered_time")
+            end_t = alert_info.get("end_time")
+            rem_s = alert_info.get("remaining_str", "")
+            dur_s = alert_info.get("duration_str", "")
+            direct_ans = (
+                f"현재 시장 경보 상태는 [{alert_info.get('badge_text')}]이며, "
+                f"발동시각은 {trig_t}, 예정 종료시각은 {end_t}({dur_s}, {rem_s})입니다. "
+                f"{alert_info.get('action_guide')}"
+            )
+        else:
+            direct_ans = (
+                f"현재 국내 시장은 사이드카 및 서킷브레이커 발동 기준(선물 +/-5%, 지수 -8% 등)에 해당하지 않는 "
+                f"정상 거래 범위(코스피 {kospi_pct:+.2f}%, 코스피200선물 {fut.get('change_pct', 0.0):+.2f}%) 내에 위치하고 있습니다. "
+                f"선물 변동폭이 +/-3.5% 도달 시 주의보, +/-5.0% 이상 1분간 지속 시 5분간 프로그램 매매 효력이 정지됩니다."
+            )
     elif category == "macro" or any(w in q_low for w in ["거시", "매크로", "환율", "금리", "인플레", "cpi", "유가", "vix"]):
         fx_sentiment = "고환율 부담 구간" if usdkrw >= 1350.0 else "환율 안정권"
         vix_sentiment = "경계 필요" if vix_val >= 20.0 else "안정적"
