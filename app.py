@@ -930,6 +930,131 @@ st.markdown("""
         line-height: normal !important;
     }
 
+    /* Main Screener Action Button: High Visibility, Premium Blue Gradient, 48px Height */
+    div[data-testid="stButton"].st-key-btn_run_screener,
+    .st-key-btn_run_screener {
+        margin-top: 8px !important;
+        margin-bottom: 12px !important;
+        width: 100% !important;
+    }
+    div[data-testid="stButton"].st-key-btn_run_screener button,
+    .st-key-btn_run_screener button,
+    div[data-testid="stButton"].st-key-btn_run_screener [data-testid="stBaseButton-primary"],
+    .st-key-btn_run_screener [data-testid="stBaseButton-primary"],
+    div.stButton.st-key-btn_run_screener > button {
+        height: 48px !important;
+        min-height: 48px !important;
+        max-height: 48px !important;
+        background: linear-gradient(135deg, #1E40AF 0%, #2563EB 50%, #1D4ED8 100%) !important;
+        color: #FFFFFF !important;
+        border: 1px solid #1D4ED8 !important;
+        border-radius: 8px !important;
+        font-size: 1.05rem !important;
+        font-weight: 800 !important;
+        letter-spacing: -0.3px !important;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35), 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+    div[data-testid="stButton"].st-key-btn_run_screener button p,
+    .st-key-btn_run_screener button p,
+    div[data-testid="stButton"].st-key-btn_run_screener [data-testid="stBaseButton-primary"] p,
+    .st-key-btn_run_screener [data-testid="stBaseButton-primary"] p,
+    div.stButton.st-key-btn_run_screener > button p {
+        color: #FFFFFF !important;
+        font-size: 1.05rem !important;
+        font-weight: 800 !important;
+        letter-spacing: -0.3px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: normal !important;
+    }
+    div[data-testid="stButton"].st-key-btn_run_screener button:hover,
+    .st-key-btn_run_screener button:hover,
+    div[data-testid="stButton"].st-key-btn_run_screener [data-testid="stBaseButton-primary"]:hover,
+    .st-key-btn_run_screener [data-testid="stBaseButton-primary"]:hover,
+    div.stButton.st-key-btn_run_screener > button:hover {
+        background: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%) !important;
+        border-color: #1E3A8A !important;
+        box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45), 0 2px 4px rgba(0, 0, 0, 0.12) !important;
+        transform: translateY(-1px) !important;
+    }
+    div[data-testid="stButton"].st-key-btn_run_screener button:active,
+    .st-key-btn_run_screener button:active,
+    div.stButton.st-key-btn_run_screener > button:active {
+        transform: translateY(0px) !important;
+        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25) !important;
+    }
+
+    /* Running Screener Button State */
+    div[data-testid="stButton"].st-key-btn_running_screening,
+    .st-key-btn_running_screening {
+        margin-top: 8px !important;
+        margin-bottom: 8px !important;
+        width: 100% !important;
+    }
+    div[data-testid="stButton"].st-key-btn_running_screening button,
+    .st-key-btn_running_screening button,
+    div.stButton.st-key-btn_running_screening > button {
+        height: 48px !important;
+        min-height: 48px !important;
+        max-height: 48px !important;
+        background: linear-gradient(135deg, #0369A1 0%, #0284C7 100%) !important;
+        color: #FFFFFF !important;
+        border: 1px solid #0284C7 !important;
+        border-radius: 8px !important;
+        font-size: 1.0rem !important;
+        font-weight: 700 !important;
+        box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3) !important;
+        cursor: wait !important;
+        opacity: 1.0 !important;
+    }
+    div[data-testid="stButton"].st-key-btn_running_screening button p,
+    .st-key-btn_running_screening button p,
+    div.stButton.st-key-btn_running_screening > button p {
+        color: #FFFFFF !important;
+        font-size: 1.0rem !important;
+        font-weight: 700 !important;
+        margin: 0 !important;
+    }
+
+    /* Stop Screener Button */
+    div[data-testid="stButton"].st-key-btn_cancel_screening,
+    .st-key-btn_cancel_screening {
+        margin-top: 8px !important;
+        margin-bottom: 8px !important;
+    }
+    div[data-testid="stButton"].st-key-btn_cancel_screening button,
+    .st-key-btn_cancel_screening button,
+    div.stButton.st-key-btn_cancel_screening > button {
+        height: 48px !important;
+        min-height: 48px !important;
+        max-height: 48px !important;
+        background: #FEF2F2 !important;
+        color: #DC2626 !important;
+        border: 1.5px solid #FCA5A5 !important;
+        border-radius: 8px !important;
+        font-size: 0.95rem !important;
+        font-weight: 700 !important;
+    }
+    div[data-testid="stButton"].st-key-btn_cancel_screening button p,
+    .st-key-btn_cancel_screening button p,
+    div.stButton.st-key-btn_cancel_screening > button p {
+        color: #DC2626 !important;
+        font-size: 0.95rem !important;
+        font-weight: 700 !important;
+        margin: 0 !important;
+    }
+    div[data-testid="stButton"].st-key-btn_cancel_screening button:hover,
+    .st-key-btn_cancel_screening button:hover {
+        background: #FEE2E2 !important;
+        border-color: #EF4444 !important;
+        color: #B91C1C !important;
+    }
+
     /* Secondary buttons: Clean subtle border, soft grey background */
     div.stButton > button[kind="secondary"],
     [data-testid="stBaseButton-secondary"] {
@@ -5033,13 +5158,13 @@ with tab1:
 
         prog = float(cur_st.get("progress", 0.0) or 0.0)
         pct = int(round(prog * 100))
-        screening_btn_label = f"Screening ({pct}%)"
+        screening_btn_label = f"실시간 스크리닝 분석 진행 중... ({pct}%)"
 
         col_btn_run, col_btn_cancel = st.columns([3.8, 1.2])
         with col_btn_run:
             st.button(screening_btn_label, disabled=True, use_container_width=True, key="btn_running_screening")
         with col_btn_cancel:
-            if st.button("Stop", type="secondary", use_container_width=True, key="btn_cancel_screening"):
+            if st.button("스크리닝 중단", type="secondary", use_container_width=True, key="btn_cancel_screening"):
                 sc_worker.cancel()
                 st.toast("스크리닝 중단 요청을 전송했습니다.")
                 sc_worker.reset_status()
@@ -5051,7 +5176,19 @@ with tab1:
     if is_worker_running:
         render_screening_live_progress()
     else:
-        if st.button("Screening", type="primary", use_container_width=True, key="btn_run_screener"):
+        st.markdown(
+            f'<div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; margin:10px 0 2px 0; padding:0 2px;">'
+            f'<div style="display:flex; align-items:center; gap:6px;">'
+            f'<span style="background:#0F172A; color:#FFFFFF; font-weight:700; font-size:0.75rem; padding:2px 8px; border-radius:4px;">{sc_mode.split("(")[0].strip()}</span>'
+            f'<span style="color:#475569; font-size:0.75rem; font-weight:600;">{sc_scope} · {target_market}</span>'
+            f'</div>'
+            f'<div style="color:#2563EB; font-size:0.74rem; font-weight:700;">'
+            f'● 클릭 시 실시간 팩터 전수 스크리닝 시작'
+            f'</div>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+        if st.button("실시간 퀀트 스크리닝 시작", type="primary", use_container_width=True, key="btn_run_screener"):
             st.session_state["screened_is_empty_result"] = False
             params = {
                 "sc_mode": sc_mode,
