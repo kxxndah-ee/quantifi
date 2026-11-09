@@ -50,6 +50,26 @@ class TestScoring(unittest.TestCase):
         self.assertTrue(res["score"] < 50.0)
         self.assertEqual(res["label"], "약세")
 
+    def test_falling_stock_drawdown_and_ma_breakdown_penalty(self):
+        # A declining stock where lagged MAs are 5 > 20 > 60, but Close < MA20 and Drawdown is -22%
+        row = pd.Series({
+            "RSI14": 52.2,
+            "MA5": 21220.0,
+            "MA20": 20919.5,
+            "MA60": 17176.7,
+            "VolRatio": 0.59,
+            "BB_PctB": 0.47,
+            "Close": 20650.0,
+            "High20": 26500.0,
+            "Drawdown20": -22.08,
+            "MA5_Diff": -550.0
+        })
+        res = calculate_score_for_row(row)
+        self.assertLess(res["score"], 50.0)
+        self.assertEqual(res["label"], "약세")
+        self.assertIn("이탈", res["breakdown"]["ma_status"])
+        self.assertGreater(res["breakdown"]["penalty"], 20.0)
+
 
 if __name__ == "__main__":
     unittest.main()

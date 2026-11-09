@@ -612,6 +612,15 @@ def _evaluate_single_stock(
             score = score_res["score"]
             vol_ratio = score_res["breakdown"]["vol_ratio"]
             ma_status = score_res["breakdown"]["ma_status"]
+            indicators = score_res.get("indicators", {})
+            close_val = indicators.get("close", close_p)
+            ma20_val = indicators.get("ma20", 0.0)
+            dd20_val = indicators.get("drawdown20", 0.0)
+
+            # Downward trend & falling knife guardrail:
+            # Exclude stocks breaking below 20MA or down >15% from recent 20-day high
+            if (ma20_val > 0 and close_val < ma20_val) or dd20_val <= -15.0:
+                return None
 
             if score < min_screener_score or vol_ratio < min_vol_surge:
                 return None

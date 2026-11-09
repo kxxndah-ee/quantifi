@@ -125,11 +125,16 @@ def _call_gemini_quant_expert(
         ma_status = str(breakdown.get("ma_status") or s_info.get("ma_status") or "보통")
         rule_note = str(s_info.get("rule_note") or "")
         reason_core = str(s_info.get("reason_core") or "")
+        dd20 = _safe_to_float(breakdown.get("drawdown20", s_info.get("drawdown20")), 0.0)
+        inds = s_info.get("indicators") or {}
+        m20 = _safe_to_float(inds.get("ma20"), 0.0)
+        ma_pos_desc = "20일선 하회 (단기 조정/하락)" if (m20 > 0 and close < m20) else "20일선 상회 (지지 유지)"
         return (
             f"[종목 {idx} 퀀트 팩트시트: {name} ({code}, {market})]\n"
             f"- 소속 업종: {sector} | 현재가: {close:,.0f}원 ({change_pct:+.2f}%)\n"
             f"- 퀀트 스코어: {score:.1f}점 / 100점 ({label}) | 발굴 전략: {strategy}\n"
-            f"- 전일대비 거래량 배수: {vol_ratio:.2f}배 | RSI(14): {rsi:.1f} | 이평선: {ma_status}\n"
+            f"- 전일대비 거래량 배수: {vol_ratio:.2f}배 | RSI(14): {rsi:.1f} | 이평선: {ma_status} ({ma_pos_desc})\n"
+            f"- 최근 20일 고점 대비 낙폭: {dd20:.1f}%\n"
             f"- 목표 익절가: {tp_price:,.0f}원 (+{tp_pct:.1f}%) | 손절 기준가: {sl_price:,.0f}원 (-{sl_pct:.1f}%)\n"
             f"- 핵심 근거: {reason_core} | 체결 원칙: {rule_note}\n"
         )
@@ -144,7 +149,8 @@ def _call_gemini_quant_expert(
         "사용자의 단일 또는 복수 종목 비교·복합 질문에 객관적이며 신뢰도 높은 전문가 분석 답변을 한국어로 제공하세요.\n"
         "또한 전일 미국 증시(나스닥, S&P 500, 필라델피아 반도체 SOXX, 환율) 동향과 국내 섹터별 상관관계를 반영하여 글로벌 매크로 관점의 리스크도 함께 조언하세요.\n"
         "추상적이거나 모호한 답변 대신 구체적인 가격 수치, 백분율, 우위 종목 판정을 인용하여 설명하세요.\n"
-        "매매 위험과 원칙 손절의 중요성을 항상 함께 고지하세요."
+        "매매 위험과 원칙 손절의 중요성을 항상 함께 고지하세요.\n"
+        "주의: 최근 고점 대비 낙폭이 크거나(-15% 이하) 20일선 아래로 이탈한 종목은 하락 추세/역추세 조정 국면이므로 무분별한 매수 추천을 절대 금지하고, 20일선 회복 전까지 신규 매수 보류 및 관망/손절 방어 지침을 제시하십시오."
     )
 
     macro_text = ""
@@ -540,6 +546,9 @@ def _built_in_quant_reasoning(
 
     # 4. 지금 사도 되나요? / 진입 가능 여부 / 추격매수 진단
     elif any(k in q_lower for k in ["사도", "진입", "매수", "추격", "타이밍", "신규", "들어가", "살까", "사볼까", "지금 사"]):
+        drawdown20 = _safe_to_float(indicators.get("drawdown20", breakdown.get("drawdown20")), 0.0)
+        is_falling_trend = (ma20 > 0 and close < ma20) or drawdown20 <= -15.0 or score < 50.0
+
         if "장전" in strategy or "시초가" in strategy:
             risk_badge = " [우수: 장전 시초가 공략 후보]"
             verdict = "전일 확정 데이터 기반으로 사전 압축된 장전 시초가 공략 후보입니다."
@@ -550,6 +559,11 @@ def _built_in_quant_reasoning(
             verdict = "현재 당일 상승률이 과도하게 높고 단기 과열 구간이므로, 현 위치에서의 불타기 신규 진입은 고점 윗꼬리에 물릴 확률이 68% 이상입니다."
             action_guide = "장중 급등 직후 첫 번째 15분봉/30분봉 눌림목 지지 반등(시초가 부근 지지)을 반드시 확인한 후 분할 진입하거나 관망을 권장합니다."
             direct_buy = f"**현재 위치에서 {name} 신규 매수는 [고위험: 추격매수 절대 금지]입니다.** 당일 {change_pct:+.2f}% 급등 및 RSI {rsi:.1f}pt 과열로 상투에 물릴 위험이 68% 이상입니다. 눌림목 지지({support_1:,.0f}원) 확인 전까지 관망하십시오."
+        elif is_falling_trend:
+            risk_badge = " [비권장: 20일선 이탈 및 역추세 하락 국면]"
+            verdict = f"최근 20일 고점 대비 {drawdown20:.1f}% 하락 중이며 20일 이동평균선({ma20:,.0f}원)을 하향 이탈한 상태입니다. 단기 역추세 조정이 진행 중이므로 신규 매수 진입은 부적합합니다."
+            action_guide = f"현재가 {close:,.0f}원에서 섣부른 물타기나 신규 매수를 자제하고, 주가가 20일선({ma20:,.0f}원) 위에 안착하고 바닥 지지 캔들이 형성될 때까지 관망을 강력 권장합니다."
+            direct_buy = f"**현재 {name} 신규 매수는 [비권장: 20일선 이탈 및 고점대비 지속 하락] 구간입니다.** 최근 고점 대비 {drawdown20:.1f}% 하락 및 20일선({ma20:,.0f}원) 하회로 추가 낙폭 위험이 높으므로 지지선 안착 확인 전까지 신규 매수를 보류하고 관망하십시오."
         elif change_pct >= 8.0:
             risk_badge = " [중립: 돌파 추세 분할 진입 가능]"
             verdict = "거래량이 탄탄하게 받쳐주고 있으나 당일 변동성이 커진 위치입니다."

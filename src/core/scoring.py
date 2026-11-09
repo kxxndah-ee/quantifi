@@ -76,6 +76,15 @@ def compute_point_in_time_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["BB_Lower"] = lower
     df["BB_PctB"] = pct_b
 
+    # 20-day High and Drawdown
+    high_series = df["High"] if "High" in df.columns else close
+    df["High20"] = high_series.rolling(window=20, min_periods=1).max()
+    df["Drawdown20"] = ((close - df["High20"]) / df["High20"].replace(0, np.nan)) * 100.0
+    df["Drawdown20"] = df["Drawdown20"].fillna(0.0)
+
+    # MA5 Slope
+    df["MA5_Diff"] = df["MA5"].diff().fillna(0.0)
+
     return df
 
 
@@ -98,6 +107,9 @@ def calculate_score_for_row(row: pd.Series, weights: Optional[Dict[str, float]] 
     bb_pct = float(row.get("BB_PctB", 0.5))
     close = float(row.get("Close", 0.0))
     change_pct = float(row.get("change_pct", row.get("Change", 0.0)))
+    drawdown20 = float(row.get("Drawdown20", 0.0))
+    high20 = float(row.get("High20", 0.0))
+    ma5_diff = float(row.get("MA5_Diff", 0.0))
 
     # 1. RSI Score (Base 0~1 multiplier * w_rsi)
     # 45~65: momentum/pullback rebound zone -> 100%
@@ -106,7 +118,11 @@ def calculate_score_for_row(row: pd.Series, weights: Optional[Dict[str, float]] 
     # 65~75: extended momentum -> 60%
     # >75: overbought risk -> 20%
     if 45.0 <= rsi_val <= 65.0:
-        rsi_factor = 1.0
+        # If in severe drawdown or broken below 20MA & 5MA, RSI is downward drift, not momentum
+        if drawdown20 <= -15.0 or (ma20 > 0 and close < ma20 and close < ma5):
+            rsi_factor = 0.40
+        else:
+            rsi_factor = 1.0
     elif rsi_val <= 30.0:
         rsi_factor = 0.85
     elif 30.0 < rsi_val < 45.0:
@@ -117,18 +133,28 @@ def calculate_score_for_row(row: pd.Series, weights: Optional[Dict[str, float]] 
         rsi_factor = 0.20
     rsi_score = rsi_factor * w_rsi
 
-    # 2. Moving Average Alignment Score
-    # 5 > 20 > 60: 100%
-    # 5 > 20 (short-term bullish): 65%
-    # otherwise: 15%
+    # 2. Moving Average Alignment & Price Position Score
+    # Moving averages lag actual price. Verify actual price position relative to MA20 and MA5.
     if ma5 > ma20 > ma60 > 0:
-        ma_factor = 1.0
-        ma_status = "정배열 (5>20>60)"
+        if close >= ma20 and close >= ma5:
+            ma_factor = 1.0
+            ma_status = "정배열 (5>20>60)"
+        elif close >= ma20:
+            ma_factor = 0.80
+            ma_status = "20일선 지지 (5일선 하회 눌림)"
+        else:
+            # Breakdown below 20MA despite lagging alignment
+            ma_factor = 0.20
+            ma_status = "20일선 이탈 (하향조정)"
     elif ma5 > ma20 > 0:
-        ma_factor = 0.65
-        ma_status = "단기골든 (5>20)"
+        if close >= ma20:
+            ma_factor = 0.65
+            ma_status = "단기골든 (5>20)"
+        else:
+            ma_factor = 0.15
+            ma_status = "단기선 이탈 (20일선 하회)"
     else:
-        ma_factor = 0.15
+        ma_factor = 0.10
         ma_status = "역배열/혼조"
     ma_score = ma_factor * w_ma
 
@@ -155,24 +181,46 @@ def calculate_score_for_row(row: pd.Series, weights: Optional[Dict[str, float]] 
     # < 0.2 (oversold band touch): 60%
     # > 0.8 (band top resistance): 25%
     if 0.2 <= bb_pct <= 0.8:
-        bb_factor = 1.0
+        if ma20 > 0 and close < ma20 and bb_pct < 0.50:
+            bb_factor = 0.50
+        else:
+            bb_factor = 1.0
     elif bb_pct < 0.2:
         bb_factor = 0.60
     else:
         bb_factor = 0.25
     bb_score = bb_factor * w_bb
 
-    # Total Score Normalized to 100
-    raw_total = rsi_score + ma_score + vol_score + bb_score
-    total_score = round((raw_total / total_w) * 100.0, 1)
+    # 5. Peak Drawdown & Trend Breakdown Penalty
+    penalty = 0.0
+    if drawdown20 <= -20.0:
+        penalty += 25.0
+    elif drawdown20 <= -15.0:
+        penalty += 18.0
+    elif drawdown20 <= -10.0 and ma20 > 0 and close < ma20:
+        penalty += 10.0
 
-    # Label assignment
-    if total_score >= 70.0:
-        label = "강세"
-    elif total_score >= 50.0:
-        label = "중립"
+    if ma20 > 0 and close < ma20:
+        penalty += 10.0
+
+    raw_total = rsi_score + ma_score + vol_score + bb_score
+    raw_score = (raw_total / total_w) * 100.0
+    final_score = max(5.0, min(100.0, raw_score - penalty))
+    total_score = round(final_score, 1)
+
+    # Label assignment: Disallow "강세" for stocks under 20MA or suffering steep drawdown
+    if (ma20 > 0 and close < ma20) or drawdown20 <= -15.0:
+        if total_score >= 50.0:
+            label = "중립"
+        else:
+            label = "약세"
     else:
-        label = "약세"
+        if total_score >= 70.0:
+            label = "강세"
+        elif total_score >= 50.0:
+            label = "중립"
+        else:
+            label = "약세"
 
     # Dynamic TP / SL targets based on Score
     # Section 2-4:
@@ -214,12 +262,16 @@ def calculate_score_for_row(row: pd.Series, weights: Optional[Dict[str, float]] 
             "vol_ratio": round(vol_ratio, 2),
             "bb_score": round(bb_score, 1),
             "bb_pct": round(bb_pct, 2),
+            "drawdown20": round(drawdown20, 1),
+            "penalty": round(penalty, 1),
         },
         "indicators": {
             "close": close,
             "ma5": round(ma5, 1),
             "ma20": round(ma20, 1),
             "ma60": round(ma60, 1),
+            "high20": round(high20, 1),
+            "drawdown20": round(drawdown20, 1),
             "rsi14": round(rsi_val, 1),
             "vol_ratio": round(vol_ratio, 2),
             "bb_pct": round(bb_pct, 2),
@@ -353,7 +405,17 @@ def evaluate_stock_latest(df: pd.DataFrame, weights: Optional[Dict[str, float]] 
 
     # Next-Day Swing Outlook
     total_score = res["score"]
-    if total_score >= 70.0:
+    drawdown20 = float(latest_row.get("Drawdown20", 0.0))
+    close_val = float(latest_row.get("Close", 0.0))
+    ma20_val = float(latest_row.get("MA20", 0.0))
+
+    if (ma20_val > 0 and close_val < ma20_val) or drawdown20 <= -15.0:
+        next_tag = f"약세/조정 ({total_score:.1f}점)"
+        if drawdown20 <= -15.0:
+            next_desc = f"고점대비 {drawdown20:.1f}% 하락 및 20일선 하회 (추세 이탈/관망 권장)"
+        else:
+            next_desc = "20일 이동평균선 하향 이탈 (단기 조정/신규 매수 자제)"
+    elif total_score >= 70.0:
         next_tag = f"강세 ({total_score:.1f}점)"
         next_desc = "이평 정배열 & 모멘텀 우수 (스윙 긍정적)"
     elif total_score >= 50.0:

@@ -117,6 +117,11 @@ def evaluate_sniper_candidate(
     if vol_ratio < 1.2:
         return None
 
+    # 7. Drawdown from 20-day high: Disqualify severe downtrend / falling knives
+    drawdown20 = float(row.get("Drawdown20", 0.0))
+    if drawdown20 <= -15.0:
+        return None
+
     # Asymmetric optimal target for 70%+ win rate & robust return
     tp_pct = 3.0
     sl_pct = 2.0
