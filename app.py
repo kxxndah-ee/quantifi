@@ -897,22 +897,7 @@ st.markdown("""
         box-shadow: 0 0 0 2px rgba(71, 85, 105, 0.25) !important;
     }
     /* 검증&최적화 실행(활성화) 시 버튼 스타일: 기본 Primary 버튼과 완전히 동일한 크기/색상 유지 */
-    .st-key-btn_tab4_auto_trigger,
-    div.st-key-btn_tab4_auto_trigger,
-    div[data-testid="stElementContainer"]:has(.st-key-btn_tab4_auto_trigger) {
-        display: none !important;
-        position: absolute !important;
-        width: 0px !important;
-        height: 0px !important;
-        min-height: 0px !important;
-        max-height: 0px !important;
-        margin: 0px !important;
-        padding: 0px !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-        border: none !important;
-        overflow: hidden !important;
-    }
+
     .btn-verification-running,
     div.stButton.btn-verification-running > button,
     button.btn-verification-running {
@@ -4292,14 +4277,9 @@ else:
     st.session_state["main_active_tab_nav"] = main_tab_names[0]
 
 
-_def_tab = st.session_state.get('main_active_tab_nav', main_tab_names[0])
-if _def_tab not in main_tab_names:
-    _def_tab = main_tab_names[0]
-
-if "main_active_tab_nav" in st.session_state:
-    _cur_nav_tracker = str(st.session_state["main_active_tab_nav"])
-    if _cur_nav_tracker != main_tab_names[3]:
-        st.session_state["_last_active_tab_tracker"] = _cur_nav_tracker
+# Ensure main active tab nav has a valid initial default
+if "main_active_tab_nav" not in st.session_state or st.session_state["main_active_tab_nav"] not in main_tab_names:
+    st.session_state["main_active_tab_nav"] = main_tab_names[0]
 
 @st.fragment(run_every="10s")
 def render_top_realtime_market_alert_banner():
@@ -4354,57 +4334,7 @@ def render_top_realtime_market_alert_banner():
 
 render_top_realtime_market_alert_banner()
 
-tab1, tab2, tab3, tab4 = st.tabs(main_tab_names, default=_def_tab, key="main_active_tab_nav", on_change="rerun")
-
-# Client-side tab click listener for instant Tab 4 auto-execution
-st.markdown(
-    """
-    <script>
-    (function() {
-        function setupTab4ClickTrigger() {
-            try {
-                var pDoc = window.parent.document || document;
-                if (!pDoc) return;
-                var tabBtns = pDoc.querySelectorAll('button[data-baseweb="tab"], div[data-testid="stTabs"] button[role="tab"]');
-                if (tabBtns && tabBtns.length >= 4) {
-                    var tab4Btn = tabBtns[3];
-                    if (tab4Btn && !tab4Btn.dataset.tab4AutoRunBound) {
-                        tab4Btn.dataset.tab4AutoRunBound = "true";
-                        function fireTrigger() {
-                            var statusArea = pDoc.querySelector('.tab4-status-area');
-                            if (statusArea) {
-                                statusArea.innerHTML = `
-                                    <div style="width:100%; background:#F8FAFC; border:1px solid #CBD5E1; border-radius:6px; padding:6px 12px; box-sizing:border-box;">
-                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                            <span style="font-size:0.78rem; font-weight:700; color:#1E293B;">검증 및 최적화 진행 중</span>
-                                            <span style="font-size:0.78rem; font-weight:800; color:#0284C7;">진행중...</span>
-                                        </div>
-                                        <div style="width:100%; height:6px; background:#E2E8F0; border-radius:3px; overflow:hidden;">
-                                            <div style="width:25%; height:100%; background:#0284C7;"></div>
-                                        </div>
-                                    </div>
-                                `;
-                            }
-                            setTimeout(function() {
-                                var trigger = pDoc.querySelector('.st-key-btn_tab4_auto_trigger button');
-                                if (trigger) {
-                                    trigger.click();
-                                }
-                            }, 40);
-                        }
-                        tab4Btn.addEventListener("click", fireTrigger);
-                        tab4Btn.addEventListener("touchend", fireTrigger);
-                    }
-                }
-            } catch(e) {}
-        }
-        setupTab4ClickTrigger();
-        setInterval(setupTab4ClickTrigger, 600);
-    })();
-    </script>
-    """,
-    unsafe_allow_html=True
-)
+tab1, tab2, tab3, tab4 = st.tabs(main_tab_names, default=main_tab_names[0], key="main_active_tab_nav", on_change="rerun")
 
 
 # =========================================================
@@ -6479,22 +6409,24 @@ def render_unified_verification_and_tuning_section():
             unsafe_allow_html=True
         )
     with m_hdr_c2:
-        # Hidden trigger button for programmatic/DOM click from tab switch
-        trigger_clicked = st.button("run_tab4_trigger", key="btn_tab4_auto_trigger")
         status_ph = st.empty()
 
         cur_nav = st.session_state.get("main_active_tab_nav", main_tab_names[0])
-        prev_tab = st.session_state.get("_last_active_tab_tracker")
+        prev_tab = st.session_state.get("_last_seen_tab_nav")
         is_completed = bool(st.session_state.get("val_opt_completed") or st.session_state.get("last_master_run_at"))
 
-        # Trigger condition: Tab 4 clicked in DOM, or switched into Tab 4, or forced
-        should_run = (
-            trigger_clicked
-            or st.session_state.pop("_force_tab4_run", False)
-            or (cur_nav == main_tab_names[3] and prev_tab != main_tab_names[3])
-        )
+        # Trigger condition: entered Tab 4 from another tab, or forced, or never ran in session
+        is_tab4_active = (cur_nav == main_tab_names[3])
+        just_switched = is_tab4_active and (prev_tab != main_tab_names[3])
+        never_ran = is_tab4_active and not bool(st.session_state.get("tab4_session_executed", False))
+        forced_run = bool(st.session_state.pop("_force_tab4_run", False))
+
+        should_run = is_tab4_active and (just_switched or never_ran or forced_run)
 
         if should_run:
+            import time
+            st.session_state["tab4_session_executed"] = True
+
             def _render_progress_box(pct: int, msg: str):
                 p_val = max(0, min(100, pct))
                 status_ph.markdown(
@@ -6518,10 +6450,12 @@ def render_unified_verification_and_tuning_section():
             # Milestone 1: 15% (미정산 체결 내역 정산)
             _render_progress_box(15, "미정산 체결 내역 정산 중...")
             settle_pending_predictions()
+            time.sleep(0.15)
 
             # Milestone 2: 50% (다주기 실거래 성과 검증)
             _render_progress_box(50, "다주기 실거래 성과 검증 중...")
             run_weekly_batch_verification(limit_days=5, force_refresh=False)
+            time.sleep(0.15)
 
             # Milestone 3: 85% (최적화 파라미터 산출 및 스크리너 적용 준비)
             _render_progress_box(85, "AI 최적화 파라미터 산출 및 스크리너 반영 중...")
@@ -6539,20 +6473,31 @@ def render_unified_verification_and_tuning_section():
 
             st.session_state["pending_tuning_updates"] = fresh_props
             st.session_state["tuning_applied_notification"] = True
-            st.session_state["last_master_run_at"] = get_now_kst().strftime("%Y-%m-%d %H:%M:%S")
+            finish_time = get_now_kst().strftime("%Y-%m-%d %H:%M:%S")
+            st.session_state["last_master_run_at"] = finish_time
             st.session_state["last_master_best_horizon"] = fresh_horizon_lbl
             st.session_state["last_master_best_ret"] = fresh_ret
             st.session_state["last_master_best_win"] = fresh_win
             st.session_state["val_opt_completed"] = True
-            st.session_state["_last_active_tab_tracker"] = main_tab_names[3]
+            time.sleep(0.15)
 
             # Milestone 4: 100% (완료)
             _render_progress_box(100, "검증 및 AI 최적화 완료")
+            time.sleep(0.2)
+
+            status_ph.markdown(
+                f'''
+                <div class="tab4-status-area" style="width:100%; background:#F0FDF4; border:1px solid #86EFAC; border-radius:6px; padding:6px 12px; box-sizing:border-box; display:flex; align-items:center; justify-content:space-between; min-height:42px;">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span style="background:#16A34A; color:#FFFFFF; font-weight:800; font-size:0.75rem; padding:2px 7px; border-radius:4px; display:inline-block; letter-spacing:-0.2px;">완료</span>
+                        <span style="font-size:0.80rem; font-weight:700; color:#15803D;">검증 및 최적화 완료</span>
+                    </div>
+                    <span style="font-size:0.70rem; color:#166534; white-space:nowrap;">{finish_time}</span>
+                </div>
+                ''',
+                unsafe_allow_html=True
+            )
             st.toast(f"검증&최적화 완료! AI 최고 추천 주기({fresh_horizon_lbl})의 최적 파라미터가 1번 스크리너에 즉시 적용되었습니다.")
-            try:
-                st.rerun()
-            except Exception:
-                pass
         else:
             if is_completed:
                 last_time = st.session_state.get("last_master_run_at", get_now_kst().strftime("%Y-%m-%d %H:%M:%S"))
@@ -6716,4 +6661,8 @@ with tab4:
         st.error(f"검증 및 최적화 센터 로딩 중 오류가 발생했습니다: {_t4_err}")
         with st.expander("상세 오류 로그 확인", expanded=False):
             st.code(traceback.format_exc())
+
+# Record active tab navigation tracking at script completion
+if 'main_active_tab_nav' in st.session_state:
+    st.session_state['_last_seen_tab_nav'] = st.session_state['main_active_tab_nav']
 

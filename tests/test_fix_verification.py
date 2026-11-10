@@ -121,33 +121,27 @@ class TestTab4ActivationAndNavigation(unittest.TestCase):
         import app
         t4_name = app.main_tab_names[3]
 
+        def eval_should_run(cur_nav, prev_tab, executed_in_session=False, forced=False):
+            is_tab4_active = (cur_nav == t4_name)
+            just_switched = is_tab4_active and (prev_tab != t4_name)
+            never_ran = is_tab4_active and not executed_in_session
+            forced_run = bool(forced)
+            return is_tab4_active and (just_switched or never_ran or forced_run)
+
         # Case 1: Switching from Tab 1 to Tab 4 -> auto-run should trigger
-        cur_nav = t4_name
-        prev_tab = app.main_tab_names[0]
-        trigger_clicked = False
-        should_run = trigger_clicked or (cur_nav == t4_name and prev_tab != t4_name)
-        self.assertTrue(should_run)
+        self.assertTrue(eval_should_run(t4_name, app.main_tab_names[0], executed_in_session=True))
 
-        # Case 2: Hidden trigger button clicked -> should trigger regardless of previous tab
-        cur_nav = t4_name
-        prev_tab = t4_name
-        trigger_clicked = True
-        should_run = trigger_clicked or (cur_nav == t4_name and prev_tab != t4_name)
-        self.assertTrue(should_run)
+        # Case 2: Never ran in session and on Tab 4 -> should trigger
+        self.assertTrue(eval_should_run(t4_name, t4_name, executed_in_session=False))
 
-        # Case 3: Already on Tab 4 and re-rendering (e.g. toggling expander) without click -> should NOT trigger
-        cur_nav = t4_name
-        prev_tab = t4_name
-        trigger_clicked = False
-        should_run = trigger_clicked or (cur_nav == t4_name and prev_tab != t4_name)
-        self.assertFalse(should_run)
+        # Case 3: Already ran in session and still on Tab 4 (e.g. toggling expander) -> should NOT trigger
+        self.assertFalse(eval_should_run(t4_name, t4_name, executed_in_session=True))
 
         # Case 4: On Tab 1 -> auto-run should NOT trigger
-        cur_nav = app.main_tab_names[0]
-        prev_tab = app.main_tab_names[0]
-        trigger_clicked = False
-        should_run = trigger_clicked or (cur_nav == t4_name and prev_tab != t4_name)
-        self.assertFalse(should_run)
+        self.assertFalse(eval_should_run(app.main_tab_names[0], app.main_tab_names[0], executed_in_session=False))
+
+        # Case 5: Forced re-run on Tab 4 -> should trigger
+        self.assertTrue(eval_should_run(t4_name, t4_name, executed_in_session=True, forced=True))
 
 
 if __name__ == "__main__":
