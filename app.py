@@ -4280,6 +4280,11 @@ _def_tab = st.session_state.get('main_active_tab_nav', main_tab_names[0])
 if _def_tab not in main_tab_names:
     _def_tab = main_tab_names[0]
 
+if "main_active_tab_nav" in st.session_state:
+    _cur_nav_tracker = str(st.session_state["main_active_tab_nav"])
+    if _cur_nav_tracker != main_tab_names[3]:
+        st.session_state["_last_active_tab_tracker"] = _cur_nav_tracker
+
 @st.fragment(run_every="10s")
 def render_top_realtime_market_alert_banner():
     """
@@ -4333,7 +4338,7 @@ def render_top_realtime_market_alert_banner():
 
 render_top_realtime_market_alert_banner()
 
-tab1, tab2, tab3, tab4 = st.tabs(main_tab_names, default=_def_tab)
+tab1, tab2, tab3, tab4 = st.tabs(main_tab_names, default=_def_tab, key="main_active_tab_nav", on_change="rerun")
 
 
 # =========================================================
@@ -6409,7 +6414,21 @@ def render_unified_verification_and_tuning_section():
         )
     with m_hdr_c2:
         btn_ph = st.empty()
-        if btn_ph.button("검증&최적화", type="primary", use_container_width=True, key="btn_run_all_in_one_master"):
+        is_completed = bool(st.session_state.get("val_opt_completed") or st.session_state.get("last_master_run_at"))
+        btn_label = "완료" if is_completed else "검증&최적화"
+        btn_clicked = btn_ph.button(
+            btn_label,
+            type="primary",
+            use_container_width=True,
+            key="btn_run_all_in_one_master",
+            help="클릭 시 검증 및 최적화를 실행합니다." if not is_completed else "클릭 시 검증 및 최적화를 다시 실행합니다."
+        )
+
+        cur_nav = st.session_state.get("main_active_tab_nav", main_tab_names[0])
+        prev_tab = st.session_state.get("_last_active_tab_tracker")
+        should_auto_run = (cur_nav == main_tab_names[3]) and (prev_tab != main_tab_names[3])
+
+        if btn_clicked or should_auto_run:
             def _render_btn_pct(pct: int):
                 p_val = max(0, min(100, pct))
                 btn_ph.markdown(
@@ -6456,17 +6475,58 @@ def render_unified_verification_and_tuning_section():
             _get_cached_weekly_res.clear()
             _get_quick_pit_verification_res.clear()
             _get_cached_diary_history.clear()
-            st.session_state["pending_tuning_updates"] = best_props
+
+            fresh_meta_opt = _get_cached_meta_opt()
+            fresh_horizon_lbl = fresh_meta_opt["best_horizon_label"]
+            fresh_ret = fresh_meta_opt["best_expected_return"]
+            fresh_win = fresh_meta_opt["best_expected_win_rate"]
+            fresh_props = fresh_meta_opt["best_proposals"]
+
+            st.session_state["pending_tuning_updates"] = fresh_props
             st.session_state["tuning_applied_notification"] = True
             st.session_state["last_master_run_at"] = get_now_kst().strftime("%Y-%m-%d %H:%M:%S")
-            st.session_state["last_master_best_horizon"] = best_horizon_lbl
-            st.session_state["last_master_best_ret"] = best_ret
-            st.session_state["last_master_best_win"] = best_win
+            st.session_state["last_master_best_horizon"] = fresh_horizon_lbl
+            st.session_state["last_master_best_ret"] = fresh_ret
+            st.session_state["last_master_best_win"] = fresh_win
+            st.session_state["val_opt_completed"] = True
+            st.session_state["_last_active_tab_tracker"] = main_tab_names[3]
 
             # Milestone 4: 100% (완료)
             _render_btn_pct(100)
-            st.toast(f"검증&최적화 완료! AI 최고 추천 주기({best_horizon_lbl})의 최적 파라미터가 1번 스크리너에 즉시 적용되었습니다.")
-            st.rerun()
+            st.toast(f"검증&최적화 완료! AI 최고 추천 주기({fresh_horizon_lbl})의 최적 파라미터가 1번 스크리너에 즉시 적용되었습니다.")
+            try:
+                st.rerun()
+            except Exception:
+                pass
+
+    st.markdown(
+        """
+        <script>
+        (function() {
+            try {
+                var pDoc = window.parent.document;
+                if (!pDoc) return;
+                var tabBtns = pDoc.querySelectorAll('button[data-baseweb="tab"], div[data-testid="stTabs"] button[role="tab"]');
+                if (tabBtns && tabBtns.length >= 4) {
+                    var tab4Btn = tabBtns[3];
+                    if (tab4Btn && !tab4Btn.dataset.tab4Bound) {
+                        tab4Btn.dataset.tab4Bound = "true";
+                        tab4Btn.addEventListener("click", function() {
+                            if (tab4Btn.getAttribute("aria-selected") === "true") {
+                                var masterBtn = pDoc.querySelector('.st-key-btn_run_all_in_one_master button');
+                                if (masterBtn) {
+                                    masterBtn.click();
+                                }
+                            }
+                        });
+                    }
+                }
+            } catch(e) {}
+        })();
+        </script>
+        """,
+        unsafe_allow_html=True
+    )
 
     # Clear boundary spacing so that header row never overlaps with metrics or banner below
     st.markdown("<div style='height:14px; margin-bottom:12px; clear:both;'></div>", unsafe_allow_html=True)
