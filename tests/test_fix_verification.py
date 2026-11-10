@@ -101,24 +101,21 @@ class TestTab4ActivationAndNavigation(unittest.TestCase):
                                         # Should run without error
                                         app.render_unified_verification_and_tuning_section()
 
-    def test_master_button_label_changes_to_completed(self):
-        # When not completed: label is '검증&최적화'
+    def test_tab4_status_area_completion_display(self):
+        # When not completed:
         session_not_completed = {}
         is_comp1 = bool(session_not_completed.get("val_opt_completed") or session_not_completed.get("last_master_run_at"))
-        label1 = "완료" if is_comp1 else "검증&최적화"
-        self.assertEqual(label1, "검증&최적화")
+        self.assertFalse(is_comp1)
 
-        # When completed via val_opt_completed: label is '완료'
+        # When completed via val_opt_completed:
         session_completed = {"val_opt_completed": True}
         is_comp2 = bool(session_completed.get("val_opt_completed") or session_completed.get("last_master_run_at"))
-        label2 = "완료" if is_comp2 else "검증&최적화"
-        self.assertEqual(label2, "완료")
+        self.assertTrue(is_comp2)
 
-        # When completed via last_master_run_at: label is '완료'
+        # When completed via last_master_run_at:
         session_run_at = {"last_master_run_at": "2026-11-10 10:00:00"}
         is_comp3 = bool(session_run_at.get("val_opt_completed") or session_run_at.get("last_master_run_at"))
-        label3 = "완료" if is_comp3 else "검증&최적화"
-        self.assertEqual(label3, "완료")
+        self.assertTrue(is_comp3)
 
     def test_tab4_auto_run_trigger_logic(self):
         import app
@@ -127,20 +124,30 @@ class TestTab4ActivationAndNavigation(unittest.TestCase):
         # Case 1: Switching from Tab 1 to Tab 4 -> auto-run should trigger
         cur_nav = t4_name
         prev_tab = app.main_tab_names[0]
-        should_auto_run = (cur_nav == t4_name) and (prev_tab != t4_name)
-        self.assertTrue(should_auto_run)
+        trigger_clicked = False
+        should_run = trigger_clicked or (cur_nav == t4_name and prev_tab != t4_name)
+        self.assertTrue(should_run)
 
-        # Case 2: Already on Tab 4 and re-rendering (e.g. toggling expander) -> auto-run should NOT trigger
+        # Case 2: Hidden trigger button clicked -> should trigger regardless of previous tab
         cur_nav = t4_name
         prev_tab = t4_name
-        should_auto_run = (cur_nav == t4_name) and (prev_tab != t4_name)
-        self.assertFalse(should_auto_run)
+        trigger_clicked = True
+        should_run = trigger_clicked or (cur_nav == t4_name and prev_tab != t4_name)
+        self.assertTrue(should_run)
 
-        # Case 3: On Tab 1 -> auto-run should NOT trigger
+        # Case 3: Already on Tab 4 and re-rendering (e.g. toggling expander) without click -> should NOT trigger
+        cur_nav = t4_name
+        prev_tab = t4_name
+        trigger_clicked = False
+        should_run = trigger_clicked or (cur_nav == t4_name and prev_tab != t4_name)
+        self.assertFalse(should_run)
+
+        # Case 4: On Tab 1 -> auto-run should NOT trigger
         cur_nav = app.main_tab_names[0]
         prev_tab = app.main_tab_names[0]
-        should_auto_run = (cur_nav == t4_name) and (prev_tab != t4_name)
-        self.assertFalse(should_auto_run)
+        trigger_clicked = False
+        should_run = trigger_clicked or (cur_nav == t4_name and prev_tab != t4_name)
+        self.assertFalse(should_run)
 
 
 if __name__ == "__main__":

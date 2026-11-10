@@ -897,6 +897,22 @@ st.markdown("""
         box-shadow: 0 0 0 2px rgba(71, 85, 105, 0.25) !important;
     }
     /* 검증&최적화 실행(활성화) 시 버튼 스타일: 기본 Primary 버튼과 완전히 동일한 크기/색상 유지 */
+    .st-key-btn_tab4_auto_trigger,
+    div.st-key-btn_tab4_auto_trigger,
+    div[data-testid="stElementContainer"]:has(.st-key-btn_tab4_auto_trigger) {
+        display: none !important;
+        position: absolute !important;
+        width: 0px !important;
+        height: 0px !important;
+        min-height: 0px !important;
+        max-height: 0px !important;
+        margin: 0px !important;
+        padding: 0px !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        border: none !important;
+        overflow: hidden !important;
+    }
     .btn-verification-running,
     div.stButton.btn-verification-running > button,
     button.btn-verification-running {
@@ -4340,6 +4356,56 @@ render_top_realtime_market_alert_banner()
 
 tab1, tab2, tab3, tab4 = st.tabs(main_tab_names, default=_def_tab, key="main_active_tab_nav", on_change="rerun")
 
+# Client-side tab click listener for instant Tab 4 auto-execution
+st.markdown(
+    """
+    <script>
+    (function() {
+        function setupTab4ClickTrigger() {
+            try {
+                var pDoc = window.parent.document || document;
+                if (!pDoc) return;
+                var tabBtns = pDoc.querySelectorAll('button[data-baseweb="tab"], div[data-testid="stTabs"] button[role="tab"]');
+                if (tabBtns && tabBtns.length >= 4) {
+                    var tab4Btn = tabBtns[3];
+                    if (tab4Btn && !tab4Btn.dataset.tab4AutoRunBound) {
+                        tab4Btn.dataset.tab4AutoRunBound = "true";
+                        function fireTrigger() {
+                            var statusArea = pDoc.querySelector('.tab4-status-area');
+                            if (statusArea) {
+                                statusArea.innerHTML = `
+                                    <div style="width:100%; background:#F8FAFC; border:1px solid #CBD5E1; border-radius:6px; padding:6px 12px; box-sizing:border-box;">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                            <span style="font-size:0.78rem; font-weight:700; color:#1E293B;">검증 및 최적화 진행 중</span>
+                                            <span style="font-size:0.78rem; font-weight:800; color:#0284C7;">진행중...</span>
+                                        </div>
+                                        <div style="width:100%; height:6px; background:#E2E8F0; border-radius:3px; overflow:hidden;">
+                                            <div style="width:25%; height:100%; background:#0284C7;"></div>
+                                        </div>
+                                    </div>
+                                `;
+                            }
+                            setTimeout(function() {
+                                var trigger = pDoc.querySelector('.st-key-btn_tab4_auto_trigger button');
+                                if (trigger) {
+                                    trigger.click();
+                                }
+                            }, 40);
+                        }
+                        tab4Btn.addEventListener("click", fireTrigger);
+                        tab4Btn.addEventListener("touchend", fireTrigger);
+                    }
+                }
+            } catch(e) {}
+        }
+        setupTab4ClickTrigger();
+        setInterval(setupTab4ClickTrigger, 600);
+    })();
+    </script>
+    """,
+    unsafe_allow_html=True
+)
+
 
 # =========================================================
 # TAB 1: 시장 전체 익일 상승 후보 & 고확신 스크리너
@@ -6413,63 +6479,52 @@ def render_unified_verification_and_tuning_section():
             unsafe_allow_html=True
         )
     with m_hdr_c2:
-        btn_ph = st.empty()
-        is_completed = bool(st.session_state.get("val_opt_completed") or st.session_state.get("last_master_run_at"))
-        btn_label = "완료" if is_completed else "검증&최적화"
-        btn_clicked = btn_ph.button(
-            btn_label,
-            type="primary",
-            use_container_width=True,
-            key="btn_run_all_in_one_master",
-            help="클릭 시 검증 및 최적화를 실행합니다." if not is_completed else "클릭 시 검증 및 최적화를 다시 실행합니다."
-        )
+        # Hidden trigger button for programmatic/DOM click from tab switch
+        trigger_clicked = st.button("run_tab4_trigger", key="btn_tab4_auto_trigger")
+        status_ph = st.empty()
 
         cur_nav = st.session_state.get("main_active_tab_nav", main_tab_names[0])
         prev_tab = st.session_state.get("_last_active_tab_tracker")
-        should_auto_run = (cur_nav == main_tab_names[3]) and (prev_tab != main_tab_names[3])
+        is_completed = bool(st.session_state.get("val_opt_completed") or st.session_state.get("last_master_run_at"))
 
-        if btn_clicked or should_auto_run:
-            def _render_btn_pct(pct: int):
+        # Trigger condition: Tab 4 clicked in DOM, or switched into Tab 4, or forced
+        should_run = (
+            trigger_clicked
+            or st.session_state.pop("_force_tab4_run", False)
+            or (cur_nav == main_tab_names[3] and prev_tab != main_tab_names[3])
+        )
+
+        if should_run:
+            def _render_progress_box(pct: int, msg: str):
                 p_val = max(0, min(100, pct))
-                btn_ph.markdown(
+                status_ph.markdown(
                     f'''
-                    <div class="stButton btn-verification-running" style="width:100%; display:flex; height:2rem; min-height:2rem; align-items:center; margin:0; padding:0;">
-                        <button kind="primary" data-testid="stBaseButton-primary" class="btn-verification-running" disabled style="
-                            width: 100% !important;
-                            height: 2rem !important;
-                            min-height: 2rem !important;
-                            background-color: #475569 !important;
-                            border: 1px solid #334155 !important;
-                            color: #FFFFFF !important;
-                            padding: 0.35rem 0.8rem !important;
-                            border-radius: 5px !important;
-                            font-weight: 600 !important;
-                            font-size: 0.80rem !important;
-                            cursor: wait !important;
-                            opacity: 1.0 !important;
-                            box-shadow: none !important;
-                            text-align: center !important;
-                            display: flex !important;
-                            align-items: center !important;
-                            justify-content: center !important;
-                            margin: 0 !important;
-                            box-sizing: border-box !important;
-                        "><p style="margin:0 !important; padding:0 !important; font-size:0.80rem !important; font-weight:600 !important; color:#FFFFFF !important; line-height:normal !important;">검증&최적화({p_val}%)</p></button>
+                    <div class="tab4-status-area" style="width:100%; background:#F8FAFC; border:1px solid #CBD5E1; border-radius:6px; padding:6px 12px; box-sizing:border-box;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                            <span style="font-size:0.78rem; font-weight:700; color:#1E293B;">검증 및 최적화 진행 중</span>
+                            <span style="font-size:0.78rem; font-weight:800; color:#0284C7;">{p_val}%</span>
+                        </div>
+                        <div style="width:100%; height:6px; background:#E2E8F0; border-radius:3px; overflow:hidden;">
+                            <div style="width:{p_val}%; height:100%; background:#0284C7; transition:width 0.25s ease;"></div>
+                        </div>
+                        <div style="font-size:0.70rem; color:#64748B; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                            {msg}
+                        </div>
                     </div>
                     ''',
                     unsafe_allow_html=True
                 )
 
             # Milestone 1: 15% (미정산 체결 내역 정산)
-            _render_btn_pct(15)
+            _render_progress_box(15, "미정산 체결 내역 정산 중...")
             settle_pending_predictions()
 
             # Milestone 2: 50% (다주기 실거래 성과 검증)
-            _render_btn_pct(50)
+            _render_progress_box(50, "다주기 실거래 성과 검증 중...")
             run_weekly_batch_verification(limit_days=5, force_refresh=False)
 
             # Milestone 3: 85% (최적화 파라미터 산출 및 스크리너 적용 준비)
-            _render_btn_pct(85)
+            _render_progress_box(85, "AI 최적화 파라미터 산출 및 스크리너 반영 중...")
             _get_cached_meta_opt.clear()
             _get_cached_decay_info.clear()
             _get_cached_weekly_res.clear()
@@ -6492,41 +6547,37 @@ def render_unified_verification_and_tuning_section():
             st.session_state["_last_active_tab_tracker"] = main_tab_names[3]
 
             # Milestone 4: 100% (완료)
-            _render_btn_pct(100)
+            _render_progress_box(100, "검증 및 AI 최적화 완료")
             st.toast(f"검증&최적화 완료! AI 최고 추천 주기({fresh_horizon_lbl})의 최적 파라미터가 1번 스크리너에 즉시 적용되었습니다.")
             try:
                 st.rerun()
             except Exception:
                 pass
-
-    st.markdown(
-        """
-        <script>
-        (function() {
-            try {
-                var pDoc = window.parent.document;
-                if (!pDoc) return;
-                var tabBtns = pDoc.querySelectorAll('button[data-baseweb="tab"], div[data-testid="stTabs"] button[role="tab"]');
-                if (tabBtns && tabBtns.length >= 4) {
-                    var tab4Btn = tabBtns[3];
-                    if (tab4Btn && !tab4Btn.dataset.tab4Bound) {
-                        tab4Btn.dataset.tab4Bound = "true";
-                        tab4Btn.addEventListener("click", function() {
-                            if (tab4Btn.getAttribute("aria-selected") === "true") {
-                                var masterBtn = pDoc.querySelector('.st-key-btn_run_all_in_one_master button');
-                                if (masterBtn) {
-                                    masterBtn.click();
-                                }
-                            }
-                        });
-                    }
-                }
-            } catch(e) {}
-        })();
-        </script>
-        """,
-        unsafe_allow_html=True
-    )
+        else:
+            if is_completed:
+                last_time = st.session_state.get("last_master_run_at", get_now_kst().strftime("%Y-%m-%d %H:%M:%S"))
+                status_ph.markdown(
+                    f'''
+                    <div class="tab4-status-area" style="width:100%; background:#F0FDF4; border:1px solid #86EFAC; border-radius:6px; padding:6px 12px; box-sizing:border-box; display:flex; align-items:center; justify-content:space-between; min-height:42px;">
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span style="background:#16A34A; color:#FFFFFF; font-weight:800; font-size:0.75rem; padding:2px 7px; border-radius:4px; display:inline-block; letter-spacing:-0.2px;">완료</span>
+                            <span style="font-size:0.80rem; font-weight:700; color:#15803D;">검증 및 최적화 완료</span>
+                        </div>
+                        <span style="font-size:0.70rem; color:#166534; white-space:nowrap;">{last_time}</span>
+                    </div>
+                    ''',
+                    unsafe_allow_html=True
+                )
+            else:
+                status_ph.markdown(
+                    '''
+                    <div class="tab4-status-area" style="width:100%; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:6px 12px; box-sizing:border-box; display:flex; align-items:center; justify-content:space-between; min-height:42px;">
+                        <span style="font-size:0.78rem; font-weight:600; color:#64748B;">탭 선택 시 자동 실행</span>
+                        <span style="font-size:0.72rem; color:#94A3B8;">진행 대기</span>
+                    </div>
+                    ''',
+                    unsafe_allow_html=True
+                )
 
     # Clear boundary spacing so that header row never overlaps with metrics or banner below
     st.markdown("<div style='height:14px; margin-bottom:12px; clear:both;'></div>", unsafe_allow_html=True)
