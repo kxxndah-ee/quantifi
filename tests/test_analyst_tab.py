@@ -557,8 +557,8 @@ class TestAnalystTab(unittest.TestCase):
             self.assertIn("> **[수석 애널리스트 핵심 직답]**:", res, f"Missing direct answer block for query: {q}")
             self.assertIn(expected_phrase, res, f"Missing expected phrase '{expected_phrase}' for query: {q}")
 
-    def test_lg_cns_query_maps_to_lg_holding_company(self):
-        # 1. 엘지씨앤에스 variations must resolve to 003550 (LG) with alias_note
+    def test_lg_cns_query_maps_to_064400(self):
+        # 1. 엘지씨앤에스 variations must resolve to 064400 (LG씨엔에스)
         for q in [
             "엘지씨앤에스 오늘 전망해줘",
             "lg씨앤에스 오늘 전망해줘",
@@ -568,45 +568,47 @@ class TestAnalystTab(unittest.TestCase):
             "엘지cns 전망 분석해줘",
         ]:
             res = extract_stock_and_question_from_query(q, current_code="005930")
-            self.assertEqual(res["code"], "003550", f"Failed for query: {q}")
+            self.assertEqual(res["code"], "064400", f"Failed code for query: {q}")
             self.assertEqual(res["matched_by"], "name", f"Failed matched_by for query: {q}")
             self.assertFalse(res["is_stock_only"], f"Should not be stock only for query: {q}")
-            self.assertIn("LG CNS", res.get("alias_note", ""), f"Missing alias_note for query: {q}")
 
-        # 2. Stock-only input for LG CNS triggers default entry question for 003550
+        # 2. Stock-only input for LG CNS triggers default entry question for 064400
         res_stock_only = extract_stock_and_question_from_query("LG CNS", current_code="005930")
-        self.assertEqual(res_stock_only["code"], "003550")
+        self.assertEqual(res_stock_only["code"], "064400")
         self.assertTrue(res_stock_only["is_stock_only"])
-        self.assertIn("LG CNS", res_stock_only.get("alias_note", ""))
+
+        # 3. 6-digit stock code query for 064400 directly resolves
+        res_code = extract_stock_and_question_from_query("064400 오늘 전망해줘", current_code="005930")
+        self.assertEqual(res_code["code"], "064400")
+        self.assertEqual(res_code["matched_by"], "code")
 
     def test_lg_cns_quant_answer_content(self):
-        lg_payload = {
-            "name": "LG",
-            "code": "003550",
+        lg_cns_payload = {
+            "name": "LG씨엔에스",
+            "code": "064400",
             "market": "KOSPI",
-            "sector": "지주사",
-            "close": 82000.0,
-            "change_pct": 1.5,
-            "score": 78.0,
+            "sector": "소프트웨어/IT",
+            "close": 72700.0,
+            "change_pct": 0.55,
+            "score": 71.2,
             "label": "우수",
             "strategy_tag": "고확신 퀀트 모멘텀",
-            "tp_pct": 5.0,
-            "sl_pct": 2.5,
-            "vol_ratio": 1.8,
-            "rsi": 58.0,
-            "ma_status": "이평 정배열",
-            "reason_core": "지주사 가치 재평가 및 수급 유입",
+            "tp_pct": 2.0,
+            "sl_pct": 2.0,
+            "vol_ratio": 1.85,
+            "rsi": 55.7,
+            "ma_status": "단기 정배열",
+            "reason_core": "IT 서비스 및 클라우드 DX 모멘텀",
             "rule_note": "목표가 분할 익절 및 손절가 원칙 대응",
-            "breakdown": {"rsi_val": 58.0, "vol_ratio": 1.8, "ma_status": "이평 정배열"},
-            "indicators": {"ma5": 81000, "ma20": 79500, "ma60": 77000},
+            "breakdown": {"rsi_val": 55.7, "vol_ratio": 1.85, "ma_status": "단기 정배열"},
+            "indicators": {"ma5": 69500, "ma20": 68910, "ma60": 70600},
         }
 
-        ans = generate_quant_expert_answer(lg_payload, "엘지씨앤에스 오늘 전망해줘")
-        self.assertIn("LG CNS", ans)
-        self.assertIn("003550", ans)
-        self.assertIn("비상장", ans)
-        self.assertIn("49.95%", ans)
+        ans = generate_quant_expert_answer(lg_cns_payload, "lg씨앤에스 오늘 전망")
+        self.assertIn("LG씨엔에스", ans)
+        self.assertIn("064400", ans)
         self.assertNotIn("삼성전자", ans)
+        self.assertNotIn("비상장", ans)
 
     def test_unrecognized_stock_guardrail(self):
         # 1. Unrecognized companies must be classified as 'unrecognized' without defaulting to Samsung Electronics

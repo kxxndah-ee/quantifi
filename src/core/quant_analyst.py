@@ -129,13 +129,6 @@ def _call_gemini_quant_expert(
         inds = s_info.get("indicators") or {}
         m20 = _safe_to_float(inds.get("ma20"), 0.0)
         ma_pos_desc = "20일선 하회 (단기 조정/하락)" if (m20 > 0 and close < m20) else "20일선 상회 (지지 유지)"
-        extra_cns_info = ""
-        if code == "003550" and any(k in question.lower() for k in ["cns", "씨앤에스", "씨엔에스"]):
-            extra_cns_info = (
-                "- [비상장 자회사 연계]: 사용자가 질문한 LG CNS(엘지씨앤에스)는 비상장사이며, "
-                "분석 대상인 (주)LG(003550)가 지분 49.95%를 보유한 최대주주(상장 모회사)입니다. "
-                "LG CNS는 단독 매매가 불가하며, IPO 추진에 따른 구주매출 및 자회사 지분가치 재평가 모멘텀은 (주)LG 주가에 직접 반영됩니다.\n"
-            )
         return (
             f"[종목 {idx} 퀀트 팩트시트: {name} ({code}, {market})]\n"
             f"- 소속 업종: {sector} | 현재가: {close:,.0f}원 ({change_pct:+.2f}%)\n"
@@ -144,7 +137,6 @@ def _call_gemini_quant_expert(
             f"- 최근 20일 고점 대비 낙폭: {dd20:.1f}%\n"
             f"- 목표 익절가: {tp_price:,.0f}원 (+{tp_pct:.1f}%) | 손절 기준가: {sl_price:,.0f}원 (-{sl_pct:.1f}%)\n"
             f"- 핵심 근거: {reason_core} | 체결 원칙: {rule_note}\n"
-            f"{extra_cns_info}"
         )
 
     system_instruction = (
@@ -313,7 +305,6 @@ def _built_in_quant_reasoning(
 
     q_clean = question.strip()
     q_lower = q_clean.lower()
-    is_lg_cns_query = (code == "003550") and any(k in q_lower for k in ["cns", "씨앤에스", "씨엔에스"])
 
     preset_prompts = {
         "왜 급등하나요? 거래량과 수급 상승 원인을 정밀 분석해줘.",
@@ -1035,15 +1026,7 @@ def _built_in_quant_reasoning(
         q_words = [w for w in re.findall(r'[가-힣a-zA-Z0-9]+', q_clean) if len(w) >= 2 and w not in ["어떻게", "있나요", "인가요", "해주세요", "알려줘", "궁금", "생각"]]
         topic_summary = ", ".join(q_words[:3]) if q_words else "단기 주가 및 수급 방향성"
 
-        if is_lg_cns_query:
-            outlook_verdict = f"LG CNS IPO 지분가치 반영 및 상방 모멘텀 (종합 퀀트 스코어 {score:.1f}점 · {label})"
-            custom_direct = (
-                f"**LG CNS(엘지씨앤에스)는 비상장 법인으로 정규 증시에서 단독 거래되지 않으며, 지분 49.95%를 보유한 모회사 (주)LG({code})가 직접적인 상장 수혜주로 거래됩니다.** "
-                f"IPO(기업공개) 대어로 꼽히는 LG CNS의 기업가치 재평가 및 구주매출 모멘텀을 고려할 때, "
-                f"상장 모회사인 (주)LG의 현재가 {close:,.0f}원({change_pct:+.2f}%)은 1차 지지선({support_1:,.0f}원)의 지지력을 바탕으로 "
-                f"1차 목표가 {tp_price:,.0f}원(+{tp_pct:.1f}%), 원칙 손절가 {sl_price:,.0f}원(-{sl_pct:.1f}%)의 손익비 {rr_ratio:.2f}:1 전략으로 분할 대응하는 것이 정석 퀀트 판단입니다."
-            )
-        elif score >= 75.0:
+        if score >= 75.0:
             outlook_verdict = f"상방 모멘텀 우위 (종합 퀀트 스코어 {score:.1f}점 · 오후 탄력 {aft_score:.1f}점 · {label})"
             custom_direct = (
                 f"**{name}에 대한 퀀트 종합 판정은 [{outlook_verdict}]입니다.** "
@@ -1065,19 +1048,12 @@ def _built_in_quant_reasoning(
                 f"무리한 추격매수를 지양하고 1차 지지선({support_1:,.0f}원) 및 원칙 손절선({sl_price:,.0f}원, -{sl_pct:.1f}%) 이탈 여부를 최우선 모니터링하십시오."
             )
 
-        cns_report_bullet = ""
-        if is_lg_cns_query:
-            cns_report_bullet = (
-                f"- **비상장 자회사 및 IPO 팩트체크**: LG CNS(엘지씨앤에스)는 (주)LG(003550)가 지분 49.95%를 보유한 핵심 IT/클라우드 자회사입니다. "
-                f"비상장 기업이므로 정규 시장 단독 매매가 불가하며, 증시에서는 상장 모회사 (주)LG가 IPO 수혜주로 직결되어 거래됩니다.\n"
-            )
-
         ans = f"""> **[수석 애널리스트 핵심 직답]**: {custom_direct}
 
 ### **{name} ({code}) 퀀트 수석 애널리스트 심층 리서치 리포트**
 
 - **질문 분석**: `{q_clean}` (핵심 분석 토픽: `{topic_summary}`)
-{cns_report_bullet}- **퀀트 산출 결과값 (종합 판정)**: **{outlook_verdict}**
+- **퀀트 산출 결과값 (종합 판정)**: **{outlook_verdict}**
   - **현재가 / 등락률**: **{close:,.0f}원** ({change_pct:+.2f}%) | 소속 업종: **[{sector}]** ({market})
   - **1차 목표 익절가**: **{tp_price:,.0f}원 (+{tp_pct:.1f}%)** | **원칙 손절가**: **{sl_price:,.0f}원 (-{sl_pct:.1f}%)** (손익비 **{rr_ratio:.2f} : 1**)
   - **핵심 지지선 / 저항선**: 1차 지지선 **{support_1:,.0f}원** (피벗 **{pivot_price:,.0f}원**) | 돌파 저항선 **{resist_1:,.0f}원**
@@ -1112,13 +1088,6 @@ def _built_in_quant_reasoning(
 
     if fallback_notice:
         ans += "\n\n*(※ Gemini API 연동 대기 중으로 내장 퀀트 수치 추론 엔진이 실시간 생성한 정밀 리포트입니다.)*"
-
-    if is_lg_cns_query and not ans.startswith("> **[비상장 자회사"):
-        ans = (
-            "> **[비상장 자회사 연계 안내]**: 질의하신 **LG CNS(엘지씨앤에스)**는 비상장 법인이며, "
-            "**지분 49.95%를 보유한 상장 모회사 (주)LG(003550)**의 실시간 퀀트 데이터 및 IPO 수혜 분석을 제공합니다.\n\n"
-            + ans
-        )
 
     if chat_history and len(chat_history) > 0:
         last_item = chat_history[-1]
@@ -1516,22 +1485,25 @@ def build_stock_quant_snapshot(code: str) -> Dict[str, Any]:
 _UNIVERSE_CACHE: Optional[List[tuple]] = None
 
 _STOCK_ALIASES: Dict[str, tuple] = {
-    # LG 및 LG CNS (비상장 자회사, (주)LG 지분율 49.95%)
-    "엘지씨앤에스": ("003550", "LG"),
-    "lg씨앤에스": ("003550", "LG"),
-    "LG씨앤에스": ("003550", "LG"),
-    "엘지씨엔에스": ("003550", "LG"),
-    "lg씨엔에스": ("003550", "LG"),
-    "LG씨엔에스": ("003550", "LG"),
-    "lg cns": ("003550", "LG"),
-    "LG CNS": ("003550", "LG"),
-    "lgcns": ("003550", "LG"),
-    "LGCNS": ("003550", "LG"),
-    "엘지cns": ("003550", "LG"),
-    "엘지 cns": ("003550", "LG"),
-    "엘지 CNS": ("003550", "LG"),
-    "씨앤에스": ("003550", "LG"),
-    "씨엔에스": ("003550", "LG"),
+    # LG씨엔에스 (064400, KOSPI) 및 표기 변형/별칭
+    "LG씨엔에스": ("064400", "LG씨엔에스"),
+    "lg씨엔에스": ("064400", "LG씨엔에스"),
+    "엘지씨엔에스": ("064400", "LG씨엔에스"),
+    "LG씨앤에스": ("064400", "LG씨엔에스"),
+    "lg씨앤에스": ("064400", "LG씨엔에스"),
+    "엘지씨앤에스": ("064400", "LG씨엔에스"),
+    "LG CNS": ("064400", "LG씨엔에스"),
+    "lg cns": ("064400", "LG씨엔에스"),
+    "lgcns": ("064400", "LG씨엔에스"),
+    "LGCNS": ("064400", "LG씨엔에스"),
+    "Lg cns": ("064400", "LG씨엔에스"),
+    "Lg CNS": ("064400", "LG씨엔에스"),
+    "엘지cns": ("064400", "LG씨엔에스"),
+    "엘지 cns": ("064400", "LG씨엔에스"),
+    "엘지 CNS": ("064400", "LG씨엔에스"),
+    "씨앤에스": ("064400", "LG씨엔에스"),
+    "씨엔에스": ("064400", "LG씨엔에스"),
+    # LG (003550, KOSPI 지주사)
     "엘지": ("003550", "LG"),
     "(주)LG": ("003550", "LG"),
     "주식회사LG": ("003550", "LG"),
@@ -1569,21 +1541,6 @@ _STOCK_ALIASES: Dict[str, tuple] = {
 }
 
 _STOCK_ALIAS_NOTES: Dict[str, str] = {
-    "엘지씨앤에스": "LG CNS 모회사 (지분 49.95%)",
-    "lg씨앤에스": "LG CNS 모회사 (지분 49.95%)",
-    "LG씨앤에스": "LG CNS 모회사 (지분 49.95%)",
-    "엘지씨엔에스": "LG CNS 모회사 (지분 49.95%)",
-    "lg씨엔에스": "LG CNS 모회사 (지분 49.95%)",
-    "LG씨엔에스": "LG CNS 모회사 (지분 49.95%)",
-    "lg cns": "LG CNS 모회사 (지분 49.95%)",
-    "LG CNS": "LG CNS 모회사 (지분 49.95%)",
-    "lgcns": "LG CNS 모회사 (지분 49.95%)",
-    "LGCNS": "LG CNS 모회사 (지분 49.95%)",
-    "엘지cns": "LG CNS 모회사 (지분 49.95%)",
-    "엘지 cns": "LG CNS 모회사 (지분 49.95%)",
-    "엘지 CNS": "LG CNS 모회사 (지분 49.95%)",
-    "씨앤에스": "LG CNS 모회사 (지분 49.95%)",
-    "씨엔에스": "LG CNS 모회사 (지분 49.95%)",
     "두나무": "두나무 지분 보유사",
     "업비트": "두나무(업비트) 지분 보유사",
     "토스": "토스 지분 보유사",
