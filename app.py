@@ -3987,6 +3987,7 @@ main_tab_names = [
     "2. Q&A",
     "3. 관심종목",
     "4. 검증 및 최적화",
+    "5. 비트코인",
 ]
 
 
@@ -4265,7 +4266,9 @@ if "pending_active_tab" in st.session_state:
 if "main_active_tab_nav" in st.session_state:
     _cur_nav = str(st.session_state["main_active_tab_nav"])
     if _cur_nav not in main_tab_names:
-        if any(w in _cur_nav for w in ["4", "5", "검증", "최적화", "다이어리", "워크포워드"]):
+        if any(w in _cur_nav for w in ["5", "비트코인", "BTC", "bitcoin", "HMM"]):
+            st.session_state["main_active_tab_nav"] = main_tab_names[4]
+        elif any(w in _cur_nav for w in ["4", "검증", "최적화", "다이어리", "워크포워드"]):
             st.session_state["main_active_tab_nav"] = main_tab_names[3]
         elif any(w in _cur_nav for w in ["3", "관심", "스코어보드"]):
             st.session_state["main_active_tab_nav"] = main_tab_names[2]
@@ -4334,7 +4337,7 @@ def render_top_realtime_market_alert_banner():
 
 render_top_realtime_market_alert_banner()
 
-tab1, tab2, tab3, tab4 = st.tabs(main_tab_names, default=main_tab_names[0], key="main_active_tab_nav", on_change="rerun")
+tab1, tab2, tab3, tab4, tab5 = st.tabs(main_tab_names, default=main_tab_names[0], key="main_active_tab_nav", on_change="rerun")
 
 
 # =========================================================
@@ -6659,6 +6662,259 @@ with tab4:
     except Exception as _t4_err:
         import traceback
         st.error(f"검증 및 최적화 센터 로딩 중 오류가 발생했습니다: {_t4_err}")
+        with st.expander("상세 오류 로그 확인", expanded=False):
+            st.code(traceback.format_exc())
+
+
+
+def render_btc_regime_tab():
+    from src.backtest.btc_regime import run_or_load_btc_regime_analysis, Visualizer
+
+    # 1. Header Banner
+    h_c1, h_c2 = st.columns([3.5, 1.5], vertical_alignment="center")
+    with h_c1:
+        st.markdown(
+            '<div style="display:flex; flex-direction:column; justify-content:center; min-height:46px;">'
+            '<div class="office-heading" style="font-size:1.10rem; font-weight:800; color:#0F172A; margin:0; line-height:1.3;">'
+            '[비트코인 거시 시장 레짐 분류기 & 워크포워드 검증 엔진]'
+            '</div>'
+            '<div style="font-size:0.78rem; color:#64748B; margin-top:3px; line-height:1.3;">'
+            'Gaussian HMM (2-State: Bull vs Bear) 은닉 마르코프 모델 기반 국면 분류 및 10년 OOS 전진 분석'
+            '</div>'
+            '</div>',
+            unsafe_allow_html=True
+        )
+    with h_c2:
+        refresh_clicked = st.button("최신 데이터 갱신 및 재검증", key="btn_refresh_btc_regime", use_container_width=True)
+
+    status_ph = st.empty()
+
+    if refresh_clicked:
+        def _prog_cb(pct, msg):
+            p_val = int(pct * 100)
+            status_ph.markdown(
+                f'''
+                <div style="width:100%; background:#F8FAFC; border:1px solid #CBD5E1; border-radius:6px; padding:6px 12px; margin-bottom:8px; box-sizing:border-box;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <span style="font-size:0.78rem; font-weight:700; color:#1E293B;">비트코인 모델 재학습 및 전진 검증 진행 중</span>
+                        <span style="font-size:0.78rem; font-weight:800; color:#0284C7;">{p_val}%</span>
+                    </div>
+                    <div style="width:100%; height:6px; background:#E2E8F0; border-radius:3px; overflow:hidden;">
+                        <div style="width:{p_val}%; height:100%; background:#0284C7; transition:width 0.25s ease;"></div>
+                    </div>
+                    <div style="font-size:0.70rem; color:#64748B; margin-top:3px;">{msg}</div>
+                </div>
+                ''',
+                unsafe_allow_html=True
+            )
+        metrics, eval_df = run_or_load_btc_regime_analysis(force_refresh=True, progress_callback=_prog_cb)
+        status_ph.empty()
+        st.toast("비트코인 최신 데이터 갱신 및 워크포워드 재검증이 완료되었습니다!")
+    else:
+        metrics, eval_df = run_or_load_btc_regime_analysis(force_refresh=False)
+
+    if eval_df.empty:
+        st.warning("비트코인 분석 데이터를 불러올 수 없습니다. '최신 데이터 갱신'을 눌러주세요.")
+        return
+
+    latest_row = eval_df.iloc[-1]
+    latest_date_str = eval_df.index[-1].strftime("%Y-%m-%d")
+    latest_price = latest_row["price"]
+    latest_regime = int(latest_row["regime"])
+    latest_log_ret = latest_row["log_ret"]
+    latest_vol = latest_row["realized_vol"]
+    latest_trend = latest_row["trend_ratio"]
+
+    # 2. Current Market Regime Announcement Card
+    if latest_regime == 1:
+        regime_title = "상승 국면 (Bull Regime) - 롱(Long 100%) 포지션 권장"
+        regime_desc = "30일 실현 변동성 및 200일 장기 추세 괴리율 기준 강세장이 전개 중입니다. 상승 탄력에 편승하여 비트코인 롱 포지션을 유지합니다."
+        card_bg = "#F0FDF4"
+        card_border = "#86EFAC"
+        badge_bg = "#16A34A"
+        badge_text = "BULL REGIME (상승장)"
+    else:
+        regime_title = "하락/조정 국면 (Bear Regime) - 현금(Cash 0%) 방어 권장"
+        regime_desc = "200일선 하회 또는 변동성 급증으로 인한 하락 국면이 지속 중입니다. 자본 보존을 위해 무리한 매수를 지양하고 현금 비중 100%를 유지합니다."
+        card_bg = "#FEF2F2"
+        card_border = "#FCA5A5"
+        badge_bg = "#DC2626"
+        badge_text = "BEAR REGIME (하락장/위험구간)"
+
+    st.markdown(
+        f'''
+        <div style="background:{card_bg}; border:1px solid {card_border}; border-radius:8px; padding:12px 16px; margin:6px 0 14px 0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <span style="background:{badge_bg}; color:#FFFFFF; font-weight:800; font-size:0.75rem; padding:3px 9px; border-radius:4px; letter-spacing:-0.2px;">
+                        {badge_text}
+                    </span>
+                    <span style="font-size:0.92rem; font-weight:700; color:#0F172A;">
+                        {regime_title}
+                    </span>
+                </div>
+                <span style="font-size:0.75rem; color:#64748B;">
+                    기준일자: {latest_date_str} (일봉 종가 기준)
+                </span>
+            </div>
+            <div style="font-size:0.78rem; color:#475569; margin-top:6px; line-height:1.4;">
+                {regime_desc}
+            </div>
+        </div>
+        ''',
+        unsafe_allow_html=True
+    )
+
+    # 3. Macro Feature & Price Metrics
+    f_c1, f_c2, f_c3, f_c4 = st.columns(4)
+    with f_c1:
+        st.metric(
+            label="비트코인 현재가 (BTC-USD)",
+            value=f"${latest_price:,.2f}",
+            delta=f"{latest_log_ret * 100:+.2f}% (1D)",
+            help="야후 파이낸스 / FDR 기준 실시간 일봉 종가"
+        )
+    with f_c2:
+        st.metric(
+            label="30일 실현 변동성 (연율화)",
+            value=f"{latest_vol * 100:.1f}%",
+            delta="HMM 상태 전이 팩터 1",
+            delta_color="off",
+            help="최근 30일 일일 로그 수익률의 표준편차에 sqrt(365)를 곱한 연율화 변동성"
+        )
+    with f_c3:
+        st.metric(
+            label="200일 장기 추세 괴리율",
+            value=f"{latest_trend * 100:+.1f}%",
+            delta=f"Mayer Multiple {(1.0 + latest_trend):.2f}x",
+            help="(현재가 - 200일 이동평균) / 200일 이동평균 (Mayer Multiple proxy)"
+        )
+    with f_c4:
+        total_days = len(eval_df)
+        st.metric(
+            label="OOS 실전 검증 기간",
+            value=f"{total_days:,}일",
+            delta=f"{eval_df.index[0].strftime('%Y.%m')} ~ {eval_df.index[-1].strftime('%Y.%m')}",
+            delta_color="off",
+            help="초기 3년 학습 후 주간 단위로 미래를 예측한 순수 아웃오브샘플(OOS) 검증 구간"
+        )
+
+    st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+
+    # 4. Out-of-Sample Performance Comparison Card
+    strat_m = metrics.get("Regime Switching Strategy (OOS)", {})
+    bnh_m = metrics.get("Buy and Hold (OOS)", {})
+
+    st.markdown(
+        '''
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:12px 16px; margin-bottom:14px;">
+            <div style="font-size:0.85rem; font-weight:700; color:#1E293B; margin-bottom:8px;">
+                [실전 워크포워드 성과 비교: HMM 레짐 스위칭 전략 vs 단순 보유(Buy & Hold)]
+            </div>
+            <div style="font-size:0.75rem; color:#64748B; margin-bottom:10px;">
+                전략 규칙: Bull(1) 국면 익일 100% 롱 포지션 진입, Bear(0) 국면 전량 현금(0%) 매도 관망
+            </div>
+        ''',
+        unsafe_allow_html=True
+    )
+
+    p_c1, p_c2, p_c3, p_c4 = st.columns(4)
+    with p_c1:
+        st.markdown(
+            f'''
+            <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:8px 12px; text-align:center;">
+                <div style="font-size:0.72rem; color:#64748B; font-weight:600;">연평균 복리 수익률 (CAGR)</div>
+                <div style="font-size:1.05rem; font-weight:800; color:#2563EB; margin:4px 0;">{strat_m.get("CAGR", "-")}</div>
+                <div style="font-size:0.70rem; color:#94A3B8;">단순보유: {bnh_m.get("CAGR", "-")}</div>
+            </div>
+            ''',
+            unsafe_allow_html=True
+        )
+    with p_c2:
+        st.markdown(
+            f'''
+            <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:8px 12px; text-align:center;">
+                <div style="font-size:0.72rem; color:#64748B; font-weight:600;">최대 낙폭 (MDD, 하락 방어)</div>
+                <div style="font-size:1.05rem; font-weight:800; color:#16A34A; margin:4px 0;">{strat_m.get("MDD", "-")}</div>
+                <div style="font-size:0.70rem; color:#DC2626;">단순보유: {bnh_m.get("MDD", "-")}</div>
+            </div>
+            ''',
+            unsafe_allow_html=True
+        )
+    with p_c3:
+        st.markdown(
+            f'''
+            <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:8px 12px; text-align:center;">
+                <div style="font-size:0.72rem; color:#64748B; font-weight:600;">샤프 지수 (Sharpe Ratio)</div>
+                <div style="font-size:1.05rem; font-weight:800; color:#0F172A; margin:4px 0;">{strat_m.get("Sharpe", "-")}</div>
+                <div style="font-size:0.70rem; color:#94A3B8;">단순보유: {bnh_m.get("Sharpe", "-")}</div>
+            </div>
+            ''',
+            unsafe_allow_html=True
+        )
+    with p_c4:
+        st.markdown(
+            f'''
+            <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:8px 12px; text-align:center;">
+                <div style="font-size:0.72rem; color:#64748B; font-weight:600;">누적 수익률 (Total Return)</div>
+                <div style="font-size:1.05rem; font-weight:800; color:#2563EB; margin:4px 0;">{strat_m.get("TotalReturn", "-")}</div>
+                <div style="font-size:0.70rem; color:#94A3B8;">단순보유: {bnh_m.get("TotalReturn", "-")}</div>
+            </div>
+            ''',
+            unsafe_allow_html=True
+        )
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # 5. Interactive Plotly Chart
+    fig = Visualizer.build_figure(eval_df)
+    st.plotly_chart(fig, use_container_width=True)
+
+    # 6. Detailed Ledger & Technical Architecture Breakdown
+    with st.expander("[최근 30거래일 레짐 판정 및 거래 일지 전체 보기]", expanded=False):
+        tail_df = eval_df.tail(30).copy()
+        disp_df = pd.DataFrame({
+            "일자": tail_df.index.strftime("%Y-%m-%d"),
+            "종가(USD)": tail_df["price"].apply(lambda x: f"${x:,.2f}"),
+            "HMM판정국면": tail_df["regime"].apply(lambda x: "[상승(Bull)]" if x == 1 else "[하락(Bear)]"),
+            "포지션(익일)": tail_df["signal"].apply(lambda x: "Long 100%" if x == 1 else "Cash 0%"),
+            "일일로그수익률(%)": tail_df["log_ret"].apply(lambda x: f"{x * 100:+.2f}%"),
+            "전략수익률(%)": tail_df["strat_ret"].apply(lambda x: f"{x * 100:+.2f}%"),
+            "전략누적배수": tail_df["cum_strat"].apply(lambda x: f"{x:.3f}x"),
+            "B&H누적배수": tail_df["cum_bnh"].apply(lambda x: f"{x:.3f}x"),
+            "30일변동성(%)": tail_df["realized_vol"].apply(lambda x: f"{x * 100:.1f}%"),
+            "200일괴리율(%)": tail_df["trend_ratio"].apply(lambda x: f"{x * 100:+.1f}%"),
+        })
+        st.dataframe(disp_df, use_container_width=True, height=280)
+
+    with st.expander("[HMM 머신러닝 엔진 및 3대 핵심 퀀트 피처 작동 원리]", expanded=False):
+        st.markdown(
+            '''
+            **1. 모델 개요 (Gaussian Hidden Markov Model, 2-State)**
+            - 금융 시계열의 잠재 국면(Latent Market Regime)인 '상승장(Bull)'과 '하락/조정장(Bear)'을 은닉 상태로 정의하고, 과거 데이터로부터 각 상태의 전이 확률과 관측치 분포(평균 벡터, 공분산 행렬)를 추정합니다.
+            - 비지도 학습(Unsupervised Learning)으로 학습된 2개 은닉 상태 중 평균 수익률이 더 높은 상태를 자동으로 'Bull State(1)'로 태깅합니다.
+
+            **2. 3대 핵심 퀀트 피처 (Look-ahead Bias 완전 배제)**
+            - **일일 로그 수익률 (Daily Log Return)**: 가격 변동의 연속 복리 성질을 보존하며 상태별 수익률 기대치를 분리합니다.
+            - **30일 실현 변동성 (Realized Volatility)**: 하락장과 위기 국면에서 변동성이 급증하는 비대칭성(Volatility Asymmetry)을 포착합니다.
+            - **200일 장기 추세 괴리율 (Mayer Multiple Proxy)**: 장기 추세선 대비 고평가/저평가 상태와 추세 지속 여부를 판별합니다.
+
+            **3. 확장 윈도우 전진 검증 (Expanding Window Walk-Forward)**
+            - 모델은 최초 3년간(약 1,095일)의 데이터로 1차 학습된 후, 7일(1주일) 단위로 윈도우를 확장하며 모델을 재학습하고 다음 7일의 국면을 예측(Out-of-Sample)합니다.
+            - 모든 시그널은 당일 종가 확정 후 익일 시초부터 적용되므로 완벽한 실전 예측 환경을 보장합니다.
+            '''
+        )
+
+
+# =========================================================
+# TAB 5: 비트코인 거시 레짐 분류기 & 워크포워드 검증 엔진
+# =========================================================
+with tab5:
+    try:
+        render_btc_regime_tab()
+    except Exception as _t5_err:
+        import traceback
+        st.error(f"비트코인 레짐 분석 로딩 중 오류가 발생했습니다: {_t5_err}")
         with st.expander("상세 오류 로그 확인", expanded=False):
             st.code(traceback.format_exc())
 

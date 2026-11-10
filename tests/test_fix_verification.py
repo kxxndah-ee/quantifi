@@ -8,11 +8,12 @@ class TestTab4ActivationAndNavigation(unittest.TestCase):
     def test_main_tab_names_defined(self):
         import app
         self.assertTrue(hasattr(app, "main_tab_names"))
-        self.assertEqual(len(app.main_tab_names), 4)
+        self.assertEqual(len(app.main_tab_names), 5)
         self.assertEqual(app.main_tab_names[0], "1. 스크리너")
         self.assertEqual(app.main_tab_names[1], "2. Q&A")
         self.assertEqual(app.main_tab_names[2], "3. 관심종목")
         self.assertEqual(app.main_tab_names[3], "4. 검증 및 최적화")
+        self.assertEqual(app.main_tab_names[4], "5. 비트코인")
 
     def test_tab_pending_navigation_logic(self):
         main_tab_names = [
