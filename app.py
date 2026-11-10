@@ -3374,6 +3374,54 @@ def render_market_macro_qa_view():
             )
 
 
+def render_unrecognized_stock_qa_view():
+    """
+    Renders guidance view when a user queries an unrecognized or unlisted company.
+    Explains how to query listed parent companies or search regular KRX stocks,
+    preventing arbitrary fallback to default stocks (e.g., Samsung Electronics).
+    """
+    unrec_name = st.session_state.get("qa_unrecognized_name", "해당 기업")
+    raw_prompt = st.session_state.get("qa_unrecognized_prompt", "")
+
+    with st.container(border=True):
+        st.markdown(
+            f"<div style='font-size:0.85rem; font-weight:700; color:#1E293B; background:#F8FAFC; padding:6px 12px; border-radius:6px; border:1px solid #CBD5E1; margin:2px 0 8px 0;'>"
+            f"질문: <span style='color:#DC2626;'>[미확인 종목 안내] {raw_prompt}</span>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
+        st.warning(
+            f"입력하신 '{unrec_name}'은(는) 현재 KRX(코스피/코스닥) 정규 상장사 데이터베이스에서 확인되지 않았습니다."
+        )
+
+        st.markdown(
+            """
+### **수석 애널리스트 Q&A 가이드**
+
+1. **정규 상장 종목 질문**:
+   - 정확한 상장 종목명(예: `LG`, `SK하이닉스`, `삼성전자`, `NAVER`) 또는 6자리 종목코드(예: `003550`, `000660`)로 다시 질문해 주시면 실시간 퀀트 분석을 받으실 수 있습니다.
+
+2. **비상장 기업 / IPO 추진 대어 질문**:
+   - 비상장 기업은 정규 증시에서 단독 거래되지 않으므로, **지분을 보유한 상장 모회사나 관련 수혜주**로 질문하시면 지분 가치 및 IPO 모멘텀 분석이 가능합니다.
+   - 대표 예시:
+     - **LG CNS**: `LG` 또는 `(주)LG` (지분 49.95% 보유 상장 모회사)
+     - **두나무 (업비트)**: `우리기술투자` (지분 보유사)
+     - **케이뱅크**: `KT` (최대주주)
+     - **토스 (비바리퍼블리카)**: `이월드` (지분 보유사)
+     - **야놀자**: `SBI인베스트먼트` (지분 보유사)
+
+3. **국내·미국 증시 및 거시경제 질문**:
+   - `오늘 코스피 전망`, `미국 증시 나스닥 흐름`, `원달러 환율 영향`과 같이 시장 키워드로 질문하시면 매크로 퀀트 리포트를 즉시 산출합니다.
+"""
+        )
+
+        if st.button("기본 종목 분석으로 돌아가기", type="primary", use_container_width=True):
+            st.session_state["qa_view_mode"] = "stock"
+            st.session_state["qa_has_active_result"] = True
+            st.rerun()
+
+
 def render_analyst_factsheet_and_qa_tab():
     # 1. State initialization for selected stock & top screened fallback
     def_top_code = "005930"
@@ -3484,6 +3532,14 @@ def render_analyst_factsheet_and_qa_tab():
                 eff_question = parsed["question"]
                 is_stock_only = parsed["is_stock_only"]
 
+                if parsed.get("matched_by") == "unrecognized":
+                    unrec_name = parsed.get("unrecognized_name", c_prompt)
+                    st.session_state["qa_view_mode"] = "unrecognized"
+                    st.session_state["qa_unrecognized_name"] = unrec_name
+                    st.session_state["qa_unrecognized_prompt"] = c_prompt
+                    st.session_state["qa_has_active_result"] = True
+                    st.rerun()
+
                 if parsed.get("is_market_macro"):
                     st.session_state["qa_view_mode"] = "market_macro"
                     st.session_state["qa_market_prompt"] = c_prompt
@@ -3556,6 +3612,8 @@ def render_analyst_factsheet_and_qa_tab():
                     st.rerun()
                 else:
                     resolved_code = parsed["code"]
+                    alias_note = parsed.get("alias_note", "")
+                    st.session_state[f"qa_alias_note_{resolved_code}"] = alias_note
                     st.session_state["qa_compared_codes"] = []
                     st.session_state["qa_console_target_code"] = resolved_code
                     st.session_state["qa_has_active_result"] = True
@@ -3588,6 +3646,10 @@ def render_analyst_factsheet_and_qa_tab():
 
     if st.session_state.get("qa_view_mode") == "market_macro":
         render_market_macro_qa_view()
+        return
+
+    if st.session_state.get("qa_view_mode") == "unrecognized":
+        render_unrecognized_stock_qa_view()
         return
 
     with st.spinner(f"수석 애널리스트가 [{curr_target_code}] 실시간 시세 및 퀀트 지표를 분석 중입니다..."):
@@ -3656,7 +3718,14 @@ def render_analyst_factsheet_and_qa_tab():
                     comp_names.append(f"{m_info.get('name', c_c)}({c_c})")
                 disp_title = f"[{' vs '.join(comp_names)}] {clean_choice_str}"
             else:
-                disp_title = f"[{name} ({code})] {clean_choice_str}"
+                alias_note = st.session_state.get(f"qa_alias_note_{code}", "")
+                if not alias_note:
+                    p_temp = extract_stock_and_question_from_query(clean_choice_str, current_code=code, fallback_top_code=def_top_code)
+                    alias_note = p_temp.get("alias_note", "")
+                if alias_note:
+                    disp_title = f"[{name} ({code}) · {alias_note}] {clean_choice_str}"
+                else:
+                    disp_title = f"[{name} ({code})] {clean_choice_str}"
             q_ans = st.session_state.get(qa_active_ans_key, "")
             if not q_ans and clean_choice_str:
                 parsed_q = extract_stock_and_question_from_query(clean_choice_str, current_code=code, fallback_top_code=def_top_code)

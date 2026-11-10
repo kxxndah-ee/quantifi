@@ -129,6 +129,13 @@ def _call_gemini_quant_expert(
         inds = s_info.get("indicators") or {}
         m20 = _safe_to_float(inds.get("ma20"), 0.0)
         ma_pos_desc = "20일선 하회 (단기 조정/하락)" if (m20 > 0 and close < m20) else "20일선 상회 (지지 유지)"
+        extra_cns_info = ""
+        if code == "003550" and any(k in question.lower() for k in ["cns", "씨앤에스", "씨엔에스"]):
+            extra_cns_info = (
+                "- [비상장 자회사 연계]: 사용자가 질문한 LG CNS(엘지씨앤에스)는 비상장사이며, "
+                "분석 대상인 (주)LG(003550)가 지분 49.95%를 보유한 최대주주(상장 모회사)입니다. "
+                "LG CNS는 단독 매매가 불가하며, IPO 추진에 따른 구주매출 및 자회사 지분가치 재평가 모멘텀은 (주)LG 주가에 직접 반영됩니다.\n"
+            )
         return (
             f"[종목 {idx} 퀀트 팩트시트: {name} ({code}, {market})]\n"
             f"- 소속 업종: {sector} | 현재가: {close:,.0f}원 ({change_pct:+.2f}%)\n"
@@ -137,6 +144,7 @@ def _call_gemini_quant_expert(
             f"- 최근 20일 고점 대비 낙폭: {dd20:.1f}%\n"
             f"- 목표 익절가: {tp_price:,.0f}원 (+{tp_pct:.1f}%) | 손절 기준가: {sl_price:,.0f}원 (-{sl_pct:.1f}%)\n"
             f"- 핵심 근거: {reason_core} | 체결 원칙: {rule_note}\n"
+            f"{extra_cns_info}"
         )
 
     system_instruction = (
@@ -305,6 +313,7 @@ def _built_in_quant_reasoning(
 
     q_clean = question.strip()
     q_lower = q_clean.lower()
+    is_lg_cns_query = (code == "003550") and any(k in q_lower for k in ["cns", "씨앤에스", "씨엔에스"])
 
     preset_prompts = {
         "왜 급등하나요? 거래량과 수급 상승 원인을 정밀 분석해줘.",
@@ -1026,7 +1035,15 @@ def _built_in_quant_reasoning(
         q_words = [w for w in re.findall(r'[가-힣a-zA-Z0-9]+', q_clean) if len(w) >= 2 and w not in ["어떻게", "있나요", "인가요", "해주세요", "알려줘", "궁금", "생각"]]
         topic_summary = ", ".join(q_words[:3]) if q_words else "단기 주가 및 수급 방향성"
 
-        if score >= 75.0:
+        if is_lg_cns_query:
+            outlook_verdict = f"LG CNS IPO 지분가치 반영 및 상방 모멘텀 (종합 퀀트 스코어 {score:.1f}점 · {label})"
+            custom_direct = (
+                f"**LG CNS(엘지씨앤에스)는 비상장 법인으로 정규 증시에서 단독 거래되지 않으며, 지분 49.95%를 보유한 모회사 (주)LG({code})가 직접적인 상장 수혜주로 거래됩니다.** "
+                f"IPO(기업공개) 대어로 꼽히는 LG CNS의 기업가치 재평가 및 구주매출 모멘텀을 고려할 때, "
+                f"상장 모회사인 (주)LG의 현재가 {close:,.0f}원({change_pct:+.2f}%)은 1차 지지선({support_1:,.0f}원)의 지지력을 바탕으로 "
+                f"1차 목표가 {tp_price:,.0f}원(+{tp_pct:.1f}%), 원칙 손절가 {sl_price:,.0f}원(-{sl_pct:.1f}%)의 손익비 {rr_ratio:.2f}:1 전략으로 분할 대응하는 것이 정석 퀀트 판단입니다."
+            )
+        elif score >= 75.0:
             outlook_verdict = f"상방 모멘텀 우위 (종합 퀀트 스코어 {score:.1f}점 · 오후 탄력 {aft_score:.1f}점 · {label})"
             custom_direct = (
                 f"**{name}에 대한 퀀트 종합 판정은 [{outlook_verdict}]입니다.** "
@@ -1048,12 +1065,19 @@ def _built_in_quant_reasoning(
                 f"무리한 추격매수를 지양하고 1차 지지선({support_1:,.0f}원) 및 원칙 손절선({sl_price:,.0f}원, -{sl_pct:.1f}%) 이탈 여부를 최우선 모니터링하십시오."
             )
 
+        cns_report_bullet = ""
+        if is_lg_cns_query:
+            cns_report_bullet = (
+                f"- **비상장 자회사 및 IPO 팩트체크**: LG CNS(엘지씨앤에스)는 (주)LG(003550)가 지분 49.95%를 보유한 핵심 IT/클라우드 자회사입니다. "
+                f"비상장 기업이므로 정규 시장 단독 매매가 불가하며, 증시에서는 상장 모회사 (주)LG가 IPO 수혜주로 직결되어 거래됩니다.\n"
+            )
+
         ans = f"""> **[수석 애널리스트 핵심 직답]**: {custom_direct}
 
 ### **{name} ({code}) 퀀트 수석 애널리스트 심층 리서치 리포트**
 
 - **질문 분석**: `{q_clean}` (핵심 분석 토픽: `{topic_summary}`)
-- **퀀트 산출 결과값 (종합 판정)**: **{outlook_verdict}**
+{cns_report_bullet}- **퀀트 산출 결과값 (종합 판정)**: **{outlook_verdict}**
   - **현재가 / 등락률**: **{close:,.0f}원** ({change_pct:+.2f}%) | 소속 업종: **[{sector}]** ({market})
   - **1차 목표 익절가**: **{tp_price:,.0f}원 (+{tp_pct:.1f}%)** | **원칙 손절가**: **{sl_price:,.0f}원 (-{sl_pct:.1f}%)** (손익비 **{rr_ratio:.2f} : 1**)
   - **핵심 지지선 / 저항선**: 1차 지지선 **{support_1:,.0f}원** (피벗 **{pivot_price:,.0f}원**) | 돌파 저항선 **{resist_1:,.0f}원**
@@ -1088,6 +1112,13 @@ def _built_in_quant_reasoning(
 
     if fallback_notice:
         ans += "\n\n*(※ Gemini API 연동 대기 중으로 내장 퀀트 수치 추론 엔진이 실시간 생성한 정밀 리포트입니다.)*"
+
+    if is_lg_cns_query and not ans.startswith("> **[비상장 자회사"):
+        ans = (
+            "> **[비상장 자회사 연계 안내]**: 질의하신 **LG CNS(엘지씨앤에스)**는 비상장 법인이며, "
+            "**지분 49.95%를 보유한 상장 모회사 (주)LG(003550)**의 실시간 퀀트 데이터 및 IPO 수혜 분석을 제공합니다.\n\n"
+            + ans
+        )
 
     if chat_history and len(chat_history) > 0:
         last_item = chat_history[-1]
@@ -1485,6 +1516,35 @@ def build_stock_quant_snapshot(code: str) -> Dict[str, Any]:
 _UNIVERSE_CACHE: Optional[List[tuple]] = None
 
 _STOCK_ALIASES: Dict[str, tuple] = {
+    # LG 및 LG CNS (비상장 자회사, (주)LG 지분율 49.95%)
+    "엘지씨앤에스": ("003550", "LG"),
+    "lg씨앤에스": ("003550", "LG"),
+    "LG씨앤에스": ("003550", "LG"),
+    "엘지씨엔에스": ("003550", "LG"),
+    "lg씨엔에스": ("003550", "LG"),
+    "LG씨엔에스": ("003550", "LG"),
+    "lg cns": ("003550", "LG"),
+    "LG CNS": ("003550", "LG"),
+    "lgcns": ("003550", "LG"),
+    "LGCNS": ("003550", "LG"),
+    "엘지cns": ("003550", "LG"),
+    "엘지 cns": ("003550", "LG"),
+    "엘지 CNS": ("003550", "LG"),
+    "씨앤에스": ("003550", "LG"),
+    "씨엔에스": ("003550", "LG"),
+    "엘지": ("003550", "LG"),
+    "(주)LG": ("003550", "LG"),
+    "주식회사LG": ("003550", "LG"),
+    "LG지주": ("003550", "LG"),
+    "LG지주사": ("003550", "LG"),
+    # 기타 주요 비상장 연계 기업
+    "두나무": ("041190", "우리기술투자"),
+    "업비트": ("041190", "우리기술투자"),
+    "토스": ("084680", "이월드"),
+    "비바리퍼블리카": ("084680", "이월드"),
+    "케이뱅크": ("030200", "KT"),
+    "야놀자": ("019550", "SBI인베스트먼트"),
+    # 영문/한글 표기 혼용 종목
     "에스케이바이오팜": ("326030", "SK바이오팜"),
     "sk바이오팜": ("326030", "SK바이오팜"),
     "SK바이오팜": ("326030", "SK바이오팜"),
@@ -1508,16 +1568,42 @@ _STOCK_ALIASES: Dict[str, tuple] = {
     "셀트리온제약": ("068760", "셀트리온제약"),
 }
 
+_STOCK_ALIAS_NOTES: Dict[str, str] = {
+    "엘지씨앤에스": "LG CNS 모회사 (지분 49.95%)",
+    "lg씨앤에스": "LG CNS 모회사 (지분 49.95%)",
+    "LG씨앤에스": "LG CNS 모회사 (지분 49.95%)",
+    "엘지씨엔에스": "LG CNS 모회사 (지분 49.95%)",
+    "lg씨엔에스": "LG CNS 모회사 (지분 49.95%)",
+    "LG씨엔에스": "LG CNS 모회사 (지분 49.95%)",
+    "lg cns": "LG CNS 모회사 (지분 49.95%)",
+    "LG CNS": "LG CNS 모회사 (지분 49.95%)",
+    "lgcns": "LG CNS 모회사 (지분 49.95%)",
+    "LGCNS": "LG CNS 모회사 (지분 49.95%)",
+    "엘지cns": "LG CNS 모회사 (지분 49.95%)",
+    "엘지 cns": "LG CNS 모회사 (지분 49.95%)",
+    "엘지 CNS": "LG CNS 모회사 (지분 49.95%)",
+    "씨앤에스": "LG CNS 모회사 (지분 49.95%)",
+    "씨엔에스": "LG CNS 모회사 (지분 49.95%)",
+    "두나무": "두나무 지분 보유사",
+    "업비트": "두나무(업비트) 지분 보유사",
+    "토스": "토스 지분 보유사",
+    "비바리퍼블리카": "비바리퍼블리카(토스) 지분 보유사",
+    "케이뱅크": "케이뱅크 최대주주 (BC카드 모회사)",
+    "야놀자": "야놀자 투자 지분 보유사",
+}
+
 _QUESTION_STOPWORDS = {
-    "지금", "오늘", "내일", "매수", "매도", "대상", "목표", "손절", "차트", "지표",
-    "분석", "추천", "종목", "시장", "수급", "거래", "가격", "비중", "전략", "홀딩",
-    "익절", "진입", "상승", "하락", "급등", "대응", "보유", "신규", "단타", "스윙",
-    "얼마", "언제", "어떻", "어떤", "무슨", "이유", "원인", "현재", "전망", "의견",
-    "오전", "오후", "종가", "시초", "장중", "가능", "확률", "비교", "우위", "반등",
-    "추격", "눌림", "고점", "저점", "지지", "저항", "평단", "수익", "손실", "업종",
-    "섹터", "테마", "대장", "누구", "어디", "모드",
-    "국내", "미국", "한국", "글로벌", "해외", "환율", "금리", "유가", "지수",
-    "선물", "옵션", "경제", "거시", "물가", "공포",
+    "지금", "오늘", "내일", "익일", "현재", "현시각", "오전", "오후", "장초반", "장후반", "장마감", "종가", "시초", "시초가",
+    "매수", "매도", "진입", "청산", "홀딩", "보유", "익절", "손절", "추매", "추가매수", "분할매수", "분할매도", "물타기", "불타기", "단타", "스윙",
+    "목표", "목표가", "손절가", "익절가", "평단", "평단가", "손익비", "비중", "가격", "현재가", "주가", "시세", "호가", "체결", "체결강도",
+    "거래", "거래량", "거래대금", "수급", "외인", "외국인", "기관", "세력", "프로그램", "쌍끌이", "양매수", "양매도", "개인", "연기금",
+    "차트", "지표", "이평", "이평선", "정배열", "역배열", "골든크로스", "데드크로스", "rsi", "macd", "볼린저", "볼린저밴드", "피벗",
+    "지지", "지지선", "저항", "저항선", "눌림", "눌림목", "돌파", "반등", "슈팅", "급등", "급락", "상한가", "하한가", "갭상승", "갭하락",
+    "실적", "공시", "배당", "어닝", "호재", "악재", "뉴스", "재료", "이슈", "모멘텀", "리스크", "위험", "안전", "방어",
+    "종목", "주식", "증시", "시장", "추천", "전략", "원칙", "확률", "가능성", "여력", "상승", "하락", "조정",
+    "얼마", "언제", "어떻게", "어떤", "어떨까", "어때", "어떰", "어떤가요", "무슨", "이유", "원인", "왜", "알려줘", "알려주세요", "해줘", "해주세요", "부탁",
+    "전망", "의견", "생각", "진단", "브리핑", "리포트", "분석", "평가", "대응", "대응법", "살까", "팔까", "가도", "되나", "되나요", "괜찮", "괜찮아",
+    "대상", "누구", "어디", "모드", "국내", "미국", "한국", "글로벌", "해외", "환율", "금리", "유가", "지수", "선물", "옵션", "경제", "거시", "물가", "공포",
 }
 
 
@@ -1560,10 +1646,10 @@ def extract_all_stocks_from_query(raw_query: str) -> List[Dict[str, str]]:
         if alias_k.lower() not in name_to_pair:
             name_to_pair[alias_k.lower()] = alias_v
 
-    matched_spans: List[tuple] = []  # (start, end, code, name, matched_by)
+    matched_spans: List[tuple] = []  # (start, end, code, name, matched_by, matched_alias)
 
     def _overlaps(s: int, e: int) -> bool:
-        for ms, me, _, _, _ in matched_spans:
+        for ms, me, _, _, _, _ in matched_spans:
             if max(s, ms) < min(e, me):
                 return True
         return False
@@ -1572,7 +1658,7 @@ def extract_all_stocks_from_query(raw_query: str) -> List[Dict[str, str]]:
     for m in re.finditer(r"(?<!\d)(\d{6})(?!\d)", q):
         c_str = m.group(1)
         n_str = code_to_name.get(c_str, c_str)
-        matched_spans.append((m.start(), m.end(), c_str, n_str, "code"))
+        matched_spans.append((m.start(), m.end(), c_str, n_str, "code", ""))
 
     q_lower = q.lower()
 
@@ -1599,7 +1685,7 @@ def extract_all_stocks_from_query(raw_query: str) -> List[Dict[str, str]]:
             if re.search(r"[A-Za-z0-9]$", name) and end_idx < len(q) and re.match(r"[A-Za-z0-9]", q[end_idx]):
                 continue
             canon_name = code_to_name.get(code, _STOCK_ALIASES.get(name, (code, name))[1])
-            matched_spans.append((idx, end_idx, code, canon_name, "name"))
+            matched_spans.append((idx, end_idx, code, canon_name, "name", name))
 
     # 3. Token-based matching for 2-char stock names (stripping Korean particles like 와/과/랑/은/는/이/가)
     particles = ("에서", "으로", "이랑", "이나", "대비", "은", "는", "이", "가", "을", "를", "의", "에", "도", "만", "로", "과", "와", "랑", "나", "중")
@@ -1616,16 +1702,25 @@ def extract_all_stocks_from_query(raw_query: str) -> List[Dict[str, str]]:
             cand_low = cand.lower()
             if cand not in _QUESTION_STOPWORDS and cand_low in name_to_pair:
                 c_str, n_str = name_to_pair[cand_low]
-                matched_spans.append((t_start, t_start + len(cand), c_str, n_str, "name"))
+                matched_spans.append((t_start, t_start + len(cand), c_str, n_str, "name", cand))
                 break
 
     matched_spans.sort(key=lambda x: x[0])
-    results: List[Dict[str, str]] = []
+    results: List[Dict[str, Any]] = []
     seen_codes = set()
-    for _, _, c_str, n_str, m_by in matched_spans:
+    for s_idx, e_idx, c_str, n_str, m_by, m_alias in matched_spans:
         if c_str not in seen_codes:
             seen_codes.add(c_str)
-            results.append({"code": c_str, "name": n_str, "matched_by": m_by})
+            alias_note = _STOCK_ALIAS_NOTES.get(m_alias.lower(), "") if m_alias else ""
+            results.append({
+                "code": c_str,
+                "name": n_str,
+                "matched_by": m_by,
+                "start": s_idx,
+                "end": e_idx,
+                "matched_alias": m_alias,
+                "alias_note": alias_note,
+            })
     return results
 
 
@@ -1683,15 +1778,22 @@ def extract_stock_and_question_from_query(
         m_code_str = m_item["code"]
         m_name_str = m_item["name"]
         m_by = m_item["matched_by"]
+        m_alias_note = m_item.get("alias_note", "")
 
-        rem = q
-        for token_to_strip in (m_code_str, m_name_str):
-            if token_to_strip:
-                pattern = re.compile(re.escape(token_to_strip), re.IGNORECASE)
-                rem = pattern.sub("", rem, count=1).strip()
-        for alias_k, alias_v in _STOCK_ALIASES.items():
-            if alias_v[0] == m_code_str and alias_k in rem:
-                rem = rem.replace(alias_k, "", 1).strip()
+        s_pos = m_item.get("start", -1)
+        e_pos = m_item.get("end", -1)
+        if s_pos >= 0 and e_pos >= s_pos:
+            rem = (q[:s_pos] + " " + q[e_pos:]).strip()
+        else:
+            rem = q
+            for token_to_strip in (m_code_str, m_name_str):
+                if token_to_strip:
+                    pattern = re.compile(re.escape(token_to_strip), re.IGNORECASE)
+                    rem = pattern.sub("", rem, count=1).strip()
+            for alias_k, alias_v in _STOCK_ALIASES.items():
+                if alias_v[0] == m_code_str and alias_k in rem:
+                    rem = rem.replace(alias_k, "", 1).strip()
+
         rem = re.sub(r"^(은|는|이|가|을|를|의|에|에서|도|만|로|으로)(?=\s|$|\?)", "", rem).strip(" ?.,!·-")
 
         if len(rem) >= 2:
@@ -1700,6 +1802,7 @@ def extract_stock_and_question_from_query(
                 "codes": [m_code_str],
                 "question": q,
                 "matched_by": m_by,
+                "alias_note": m_alias_note,
                 "is_stock_only": False,
                 "is_comparative": False,
                 "is_market_macro": False,
@@ -1709,6 +1812,7 @@ def extract_stock_and_question_from_query(
             "codes": [m_code_str],
             "question": default_q,
             "matched_by": m_by,
+            "alias_note": m_alias_note,
             "is_stock_only": True,
             "is_comparative": False,
             "is_market_macro": False,
@@ -1749,6 +1853,20 @@ def extract_stock_and_question_from_query(
             "is_market_macro": True,
         }
 
+    # Case 4.5: Check if query targets an unrecognized stock/company name
+    unrec_name = _detect_unrecognized_stock_candidate(q)
+    if unrec_name:
+        return {
+            "code": default_code,
+            "codes": [],
+            "question": q,
+            "matched_by": "unrecognized",
+            "unrecognized_name": unrec_name,
+            "is_stock_only": False,
+            "is_comparative": False,
+            "is_market_macro": False,
+        }
+
     # Case 5: Follow-up or general question for current active stock
     return {
         "code": default_code,
@@ -1762,6 +1880,45 @@ def extract_stock_and_question_from_query(
 
 
 
+
+
+def _detect_unrecognized_stock_candidate(raw_query: str) -> Optional[str]:
+    """
+    Detects if the query appears to be asking about an unrecognized company/entity
+    (e.g., '쿠팡 오늘 전망해줘', '애플 주가 어때?') rather than a general follow-up question
+    about the currently active stock (e.g., '지금 사도 되나요?', '목표가가 얼마야?').
+    """
+    import re
+    q = (raw_query or "").strip()
+    if not q:
+        return None
+
+    tokens = re.findall(r"[가-힣A-Za-z0-9&]+", q)
+    if not tokens:
+        return None
+
+    first = tokens[0]
+    cand = first.lower()
+    particles = ("은", "는", "이", "가", "의", "에", "에서", "도", "만", "을", "를", "과", "와", "랑", "으로", "로")
+    for p in particles:
+        if cand.endswith(p) and len(cand) > len(p):
+            cand = cand[:-len(p)]
+            break
+
+    # If first token is a known financial / trading / question word, it is NOT an unrecognized stock
+    if cand in _QUESTION_STOPWORDS or first.lower() in _QUESTION_STOPWORDS:
+        return None
+
+    # Check if remainder of query looks like a question or analysis request
+    question_intent_words = (
+        "전망", "주가", "어때", "어떨까", "어떤가요", "어떰", "분석", "목표가", "시세", "살까", "팔까",
+        "매수해도", "사도", "진입", "상승", "하락", "진단", "호재", "악재", "의견", "어떻게", "대응"
+    )
+    rem = " ".join(tokens[1:]).lower()
+    if any(qw in rem for qw in question_intent_words):
+        return cand
+
+    return None
 
 
 def detect_market_macro_intent(raw_query: str) -> Dict[str, Any]:
