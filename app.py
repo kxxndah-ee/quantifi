@@ -6668,7 +6668,7 @@ with tab4:
 
 
 def render_btc_regime_tab():
-    from src.backtest.btc_regime import run_or_load_btc_regime_analysis, Visualizer
+    from src.backtest.btc_regime import run_or_load_btc_regime_analysis, Visualizer, CycleProjectionEngine
 
     # 1. Header Banner
     h_c1, h_c2 = st.columns([3.5, 1.5], vertical_alignment="center")
@@ -6799,9 +6799,113 @@ def render_btc_regime_tab():
             help="초기 3년 학습 후 주간 단위로 미래를 예측한 순수 아웃오브샘플(OOS) 검증 구간"
         )
 
-    st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+    # 4. Dynamic Cycle & Top/Bottom Projection Dashboard (시황 연동 실시간 산출)
+    proj = CycleProjectionEngine.calculate(eval_df)
 
-    # 4. Out-of-Sample Performance Comparison Card
+    st.markdown(
+        f'''
+        <div style="background:#F8FAFC; border:1px solid #CBD5E1; border-radius:8px; padding:14px 16px; margin:14px 0 16px 0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px; border-bottom:1px solid #E2E8F0; padding-bottom:8px;">
+                <div>
+                    <div style="font-size:0.95rem; font-weight:800; color:#0F172A;">
+                        [동적 거시 사이클 및 고점/저점 예측 분석 (시황 연동 실시간 산출)]
+                    </div>
+                    <div style="font-size:0.75rem; color:#64748B; margin-top:2px;">
+                        4년 반감기 주기론, Mayer Multiple 밸류에이션, 200주 이동평균선(200W SMA) 및 HMM 상태를 결합하여 현재 시황에 따라 자동 산출됩니다.
+                    </div>
+                </div>
+                <div style="font-size:0.72rem; color:#475569; background:#FFFFFF; border:1px solid #CBD5E1; padding:4px 10px; border-radius:4px; font-weight:600;">
+                    데이터 기준: {proj["current_date"]} | 직전 ATH: ${proj["ath_price"]:,.0f} ({proj["days_since_ath"]}일 경과)
+                </div>
+            </div>
+        ''',
+        unsafe_allow_html=True
+    )
+
+    c_card1, c_card2, c_card3 = st.columns(3)
+    with c_card1:
+        st.markdown(
+            f'''
+            <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:6px; padding:12px 14px; height:100%; box-sizing:border-box;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-size:0.85rem; font-weight:700; color:#0F172A;">1. 가장 낮을 시점 (바닥 분석)</span>
+                    <span style="background:{proj["bottom_badge_color"]}; color:#FFFFFF; font-size:0.70rem; font-weight:700; padding:2px 7px; border-radius:3px;">
+                        {proj["bottom_badge"]}
+                    </span>
+                </div>
+                <div style="font-size:0.76rem; color:#475569; line-height:1.45; margin-bottom:8px;">
+                    {proj["bottom_desc"]}
+                </div>
+                <div style="background:#F1F5F9; border-radius:4px; padding:8px 10px; font-size:0.73rem; color:#334155; line-height:1.5;">
+                    <div>• <b>통계적 바닥 창구:</b> {proj["bottom_window_start"]} ~ {proj["bottom_window_end"]}</div>
+                    <div>• <b>역사적 평균 바닥일:</b> {proj["bottom_window_avg"]} (고점 후 384일)</div>
+                    <div>• <b>200주선 바닥 지지:</b> ${proj["sma_200w"]:,.0f}</div>
+                    <div>• <b>Mayer 바닥 밴드:</b> ${proj["mayer_band_low"]:,.0f} ~ ${proj["mayer_band_high"]:,.0f}</div>
+                </div>
+            </div>
+            ''',
+            unsafe_allow_html=True
+        )
+
+    with c_card2:
+        st.markdown(
+            f'''
+            <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:6px; padding:12px 14px; height:100%; box-sizing:border-box;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-size:0.85rem; font-weight:700; color:#0F172A;">2. 상승기 진입 시점 (상승 시작)</span>
+                    <span style="background:{proj["stage1_badge_color"]}; color:#FFFFFF; font-size:0.70rem; font-weight:700; padding:2px 7px; border-radius:3px;">
+                        {proj["stage1_badge"]}
+                    </span>
+                </div>
+                <div style="font-size:0.76rem; color:#475569; line-height:1.45; margin-bottom:8px;">
+                    {proj["parabolic_desc"]}
+                </div>
+                <div style="background:#F1F5F9; border-radius:4px; padding:8px 10px; font-size:0.73rem; color:#334155; line-height:1.5;">
+                    <div>• <b>1단계 점진적 축적기:</b> {proj["stage1_date_str"]}</div>
+                    <div>• <b>제5차 반감기 예정:</b> {proj["next_halving"]} (추정)</div>
+                    <div>• <b>2단계 본격 폭등 랠리:</b> {proj["parabolic_start_avg"]} 전후</div>
+                    <div>• <b>대세 상승 창구:</b> {proj["parabolic_start_min"]} ~ {proj["parabolic_start_max"]}</div>
+                </div>
+            </div>
+            ''',
+            unsafe_allow_html=True
+        )
+
+    with c_card3:
+        st.markdown(
+            f'''
+            <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:6px; padding:12px 14px; height:100%; box-sizing:border-box;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-size:0.85rem; font-weight:700; color:#0F172A;">3. 상승 지속 및 최종 정점</span>
+                    <span style="background:#7C3AED; color:#FFFFFF; font-size:0.70rem; font-weight:700; padding:2px 7px; border-radius:3px;">
+                        정점 도달 예측
+                    </span>
+                </div>
+                <div style="font-size:0.76rem; color:#475569; line-height:1.45; margin-bottom:8px;">
+                    역대 2~4차 사이클의 반감기 후 최고점 도달 일수(525일, 548일, 534일)는 평균 536일(약 17.5~18개월)에 정밀하게 수렴합니다.
+                </div>
+                <div style="background:#F1F5F9; border-radius:4px; padding:8px 10px; font-size:0.73rem; color:#334155; line-height:1.5;">
+                    <div>• <b>예상 정점 윈도우:</b> {proj["peak_window_min"]} ~ {proj["peak_window_max"]}</div>
+                    <div>• <b>평균 정점 예상일:</b> {proj["peak_window_avg"]} (2029년 4분기)</div>
+                    <div>• <b>본격 폭등 지속 기간:</b> {proj["parabolic_duration_months"]}개월 (전체 {proj["total_cycle_duration_months"]}개월)</div>
+                    <div>• <b>목표가 밴드:</b> ${proj["target_conservative"]:,.0f} ~ ${proj["target_optimistic"]:,.0f} (중립 ${proj["target_median"]:,.0f})</div>
+                </div>
+            </div>
+            ''',
+            unsafe_allow_html=True
+        )
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    with st.expander("[역대 4개 사이클 vs 현재 사이클 벤치마크 비교 분석표]", expanded=False):
+        st.dataframe(proj["comparison_df"], use_container_width=True)
+        st.caption(
+            "알림: 상단 결과값은 고정된 상수가 아니며, 새로운 시세가 유입되거나 '최신 데이터 갱신' 실행 시 최신 종가, 200일선, HMM 레짐 상태에 따라 자동으로 재계산됩니다."
+        )
+
+    st.markdown("<div style='height:4px;'></div>", unsafe_allow_html=True)
+
+    # 5. Out-of-Sample Performance Comparison Card
     strat_m = metrics.get("Regime Switching Strategy (OOS)", {})
     bnh_m = metrics.get("Buy and Hold (OOS)", {})
 

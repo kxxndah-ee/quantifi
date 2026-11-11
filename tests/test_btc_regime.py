@@ -9,6 +9,7 @@ from src.backtest.btc_regime import (
     MarketRegimeModel,
     PerformanceEvaluator,
     Visualizer,
+    CycleProjectionEngine,
     run_or_load_btc_regime_analysis,
 )
 
@@ -74,6 +75,36 @@ class TestBitcoinRegimeEngine(unittest.TestCase):
         fig = Visualizer.build_figure(df)
         self.assertIsNotNone(fig)
         self.assertGreaterEqual(len(fig.data), 4)
+
+    def test_cycle_projection_engine(self):
+        res = CycleProjectionEngine.calculate(self.mock_df)
+        self.assertIn("bottom_window_avg", res)
+        self.assertIn("parabolic_start_avg", res)
+        self.assertIn("peak_window_avg", res)
+        self.assertIn("target_median", res)
+        self.assertIn("comparison_df", res)
+        self.assertIsInstance(res["comparison_df"], pd.DataFrame)
+        self.assertEqual(len(res["comparison_df"]), 5)
+
+    def test_cycle_projection_sensitivity_to_market_changes(self):
+        # Scenario A: Lower price with earlier ATH (deep drawdown)
+        df_bear = self.mock_df.copy()
+        df_bear.iloc[10, df_bear.columns.get_loc("price")] = 100000.0
+        df_bear.iloc[-1, df_bear.columns.get_loc("price")] = 25000.0
+        res_bear = CycleProjectionEngine.calculate(df_bear)
+
+        # Scenario B: High breakout price near or at ATH
+        df_bull = self.mock_df.copy()
+        df_bull.iloc[10, df_bull.columns.get_loc("price")] = 50000.0
+        df_bull.iloc[-1, df_bull.columns.get_loc("price")] = 120000.0
+        res_bull = CycleProjectionEngine.calculate(df_bull)
+
+        # Output values must dynamically adapt to market conditions
+        self.assertNotEqual(res_bear["current_price"], res_bull["current_price"])
+        self.assertNotEqual(res_bear["mayer_multiple"], res_bull["mayer_multiple"])
+        self.assertNotEqual(res_bear["current_drawdown_pct"], res_bull["current_drawdown_pct"])
+        self.assertNotEqual(res_bear["target_median"], res_bull["target_median"])
+        self.assertLess(res_bear["current_drawdown_pct"], 0)
 
     def test_run_or_load_btc_regime_analysis_cached(self):
         metrics, eval_df = run_or_load_btc_regime_analysis(force_refresh=False)
