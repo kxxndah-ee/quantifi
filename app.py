@@ -6802,93 +6802,92 @@ def render_btc_regime_tab():
     # 4. Dynamic Cycle & Top/Bottom Projection Dashboard (시황 연동 실시간 산출)
     proj = CycleProjectionEngine.calculate(eval_df)
 
-    st.markdown(
-        f'''
-        <div style="background:#F8FAFC; border:1px solid #CBD5E1; border-radius:8px; padding:16px; margin:14px 0 16px 0; box-sizing:border-box;">
-            <!-- Header -->
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:14px; border-bottom:1px solid #E2E8F0; padding-bottom:10px;">
-                <div>
-                    <div style="font-size:0.95rem; font-weight:800; color:#0F172A; line-height:1.3;">
-                        [동적 거시 사이클 및 고점/저점 예측 분석 (시황 연동 실시간 산출)]
-                    </div>
-                    <div style="font-size:0.75rem; color:#64748B; margin-top:3px; line-height:1.3;">
-                        4년 반감기 주기론, Mayer Multiple 밸류에이션, 200주 이동평균선(200W SMA) 및 HMM 상태를 결합하여 현재 시황에 따라 자동 산출됩니다.
-                    </div>
-                </div>
-                <div style="font-size:0.72rem; color:#475569; background:#FFFFFF; border:1px solid #CBD5E1; padding:4px 10px; border-radius:4px; font-weight:600; white-space:nowrap;">
-                    데이터 기준: {proj["current_date"]} | 직전 ATH: ${proj["ath_price"]:,.0f} ({proj["days_since_ath"]}일 경과)
-                </div>
-            </div>
+    with st.container(border=True):
+        header_html = (
+            '<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px; border-bottom:1px solid #E2E8F0; padding-bottom:8px;">'
+            '<div>'
+            '<div style="font-size:0.95rem; font-weight:800; color:#0F172A; line-height:1.3;">'
+            '[동적 거시 사이클 및 고점/저점 예측 분석 (시황 연동 실시간 산출)]'
+            '</div>'
+            '<div style="font-size:0.75rem; color:#64748B; margin-top:3px; line-height:1.3;">'
+            '4년 반감기 주기론, Mayer Multiple 밸류에이션, 200주 이동평균선(200W SMA) 및 HMM 상태를 결합하여 현재 시황에 따라 자동 산출됩니다.'
+            '</div>'
+            '</div>'
+            f'<div style="font-size:0.72rem; color:#475569; background:#FFFFFF; border:1px solid #CBD5E1; padding:4px 10px; border-radius:4px; font-weight:600; white-space:nowrap;">'
+            f'데이터 기준: {proj["current_date"]} | 직전 ATH: ${proj["ath_price"]:,.0f} ({proj["days_since_ath"]}일 경과)'
+            '</div>'
+            '</div>'
+        )
+        st.markdown(header_html, unsafe_allow_html=True)
 
-            <!-- 3 Cards Grid -->
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px; align-items:stretch;">
-                <!-- Card 1 -->
-                <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:6px; padding:14px; display:flex; flex-direction:column; justify-content:space-between; box-sizing:border-box;">
-                    <div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:6px;">
-                            <span style="font-size:0.85rem; font-weight:700; color:#0F172A;">1. 가장 낮을 시점 (바닥 분석)</span>
-                            <span style="background:{proj["bottom_badge_color"]}; color:#FFFFFF; font-size:0.70rem; font-weight:700; padding:2px 7px; border-radius:3px; white-space:nowrap;">
-                                {proj["bottom_badge"]}
-                            </span>
-                        </div>
-                        <div style="font-size:0.76rem; color:#475569; line-height:1.45; margin-bottom:10px;">
-                            {proj["bottom_desc"]}
-                        </div>
-                    </div>
-                    <div style="background:#F1F5F9; border-radius:4px; padding:8px 10px; font-size:0.73rem; color:#334155; line-height:1.55;">
-                        <div>- <b>통계적 바닥 창구:</b> {proj["bottom_window_start"]} ~ {proj["bottom_window_end"]}</div>
-                        <div>- <b>역사적 평균 바닥일:</b> {proj["bottom_window_avg"]} (고점 후 384일)</div>
-                        <div>- <b>200주선 바닥 지지:</b> ${proj["sma_200w"]:,.0f}</div>
-                        <div>- <b>Mayer 바닥 밴드:</b> ${proj["mayer_band_low"]:,.0f} ~ ${proj["mayer_band_high"]:,.0f}</div>
-                    </div>
-                </div>
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            card1_html = (
+                '<div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:12px 14px; min-height:245px; display:flex; flex-direction:column; justify-content:space-between; box-sizing:border-box;">'
+                '<div>'
+                '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:6px;">'
+                '<span style="font-size:0.85rem; font-weight:700; color:#0F172A;">1. 가장 낮을 시점 (바닥 분석)</span>'
+                f'<span style="background:{proj["bottom_badge_color"]}; color:#FFFFFF; font-size:0.70rem; font-weight:700; padding:2px 7px; border-radius:3px; white-space:nowrap;">'
+                f'{proj["bottom_badge"]}'
+                '</span>'
+                '</div>'
+                f'<div style="font-size:0.76rem; color:#475569; line-height:1.45; margin-bottom:10px;">{proj["bottom_desc"]}</div>'
+                '</div>'
+                '<div style="background:#F1F5F9; border-radius:4px; padding:8px 10px; font-size:0.73rem; color:#334155; line-height:1.55;">'
+                f'<div>- <b>통계적 바닥 창구:</b> {proj["bottom_window_start"]} ~ {proj["bottom_window_end"]}</div>'
+                f'<div>- <b>역사적 평균 바닥일:</b> {proj["bottom_window_avg"]} (고점 후 384일)</div>'
+                f'<div>- <b>200주선 바닥 지지:</b> ${proj["sma_200w"]:,.0f}</div>'
+                f'<div>- <b>Mayer 바닥 밴드:</b> ${proj["mayer_band_low"]:,.0f} ~ ${proj["mayer_band_high"]:,.0f}</div>'
+                '</div>'
+                '</div>'
+            )
+            st.markdown(card1_html, unsafe_allow_html=True)
 
-                <!-- Card 2 -->
-                <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:6px; padding:14px; display:flex; flex-direction:column; justify-content:space-between; box-sizing:border-box;">
-                    <div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:6px;">
-                            <span style="font-size:0.85rem; font-weight:700; color:#0F172A;">2. 상승기 진입 시점 (상승 시작)</span>
-                            <span style="background:{proj["stage1_badge_color"]}; color:#FFFFFF; font-size:0.70rem; font-weight:700; padding:2px 7px; border-radius:3px; white-space:nowrap;">
-                                {proj["stage1_badge"]}
-                            </span>
-                        </div>
-                        <div style="font-size:0.76rem; color:#475569; line-height:1.45; margin-bottom:10px;">
-                            {proj["parabolic_desc"]}
-                        </div>
-                    </div>
-                    <div style="background:#F1F5F9; border-radius:4px; padding:8px 10px; font-size:0.73rem; color:#334155; line-height:1.55;">
-                        <div>- <b>1단계 점진적 축적기:</b> {proj["stage1_date_str"]}</div>
-                        <div>- <b>제5차 반감기 예정:</b> {proj["next_halving"]} (추정)</div>
-                        <div>- <b>2단계 본격 폭등 랠리:</b> {proj["parabolic_start_avg"]} 전후</div>
-                        <div>- <b>대세 상승 창구:</b> {proj["parabolic_start_min"]} ~ {proj["parabolic_start_max"]}</div>
-                    </div>
-                </div>
+        with c2:
+            card2_html = (
+                '<div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:12px 14px; min-height:245px; display:flex; flex-direction:column; justify-content:space-between; box-sizing:border-box;">'
+                '<div>'
+                '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:6px;">'
+                '<span style="font-size:0.85rem; font-weight:700; color:#0F172A;">2. 상승기 진입 시점 (상승 시작)</span>'
+                f'<span style="background:{proj["stage1_badge_color"]}; color:#FFFFFF; font-size:0.70rem; font-weight:700; padding:2px 7px; border-radius:3px; white-space:nowrap;">'
+                f'{proj["stage1_badge"]}'
+                '</span>'
+                '</div>'
+                f'<div style="font-size:0.76rem; color:#475569; line-height:1.45; margin-bottom:10px;">{proj["parabolic_desc"]}</div>'
+                '</div>'
+                '<div style="background:#F1F5F9; border-radius:4px; padding:8px 10px; font-size:0.73rem; color:#334155; line-height:1.55;">'
+                f'<div>- <b>1단계 점진적 축적기:</b> {proj["stage1_date_str"]}</div>'
+                f'<div>- <b>제5차 반감기 예정:</b> {proj["next_halving"]} (추정)</div>'
+                f'<div>- <b>2단계 본격 폭등 랠리:</b> {proj["parabolic_start_avg"]} 전후</div>'
+                f'<div>- <b>대세 상승 창구:</b> {proj["parabolic_start_min"]} ~ {proj["parabolic_start_max"]}</div>'
+                '</div>'
+                '</div>'
+            )
+            st.markdown(card2_html, unsafe_allow_html=True)
 
-                <!-- Card 3 -->
-                <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:6px; padding:14px; display:flex; flex-direction:column; justify-content:space-between; box-sizing:border-box;">
-                    <div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:6px;">
-                            <span style="font-size:0.85rem; font-weight:700; color:#0F172A;">3. 상승 지속 및 최종 정점</span>
-                            <span style="background:#7C3AED; color:#FFFFFF; font-size:0.70rem; font-weight:700; padding:2px 7px; border-radius:3px; white-space:nowrap;">
-                                정점 도달 예측
-                            </span>
-                        </div>
-                        <div style="font-size:0.76rem; color:#475569; line-height:1.45; margin-bottom:10px;">
-                            역대 2~4차 사이클의 반감기 후 최고점 도달 일수(525일, 548일, 534일)는 평균 536일(약 17.5~18개월)에 정밀하게 수렴합니다.
-                        </div>
-                    </div>
-                    <div style="background:#F1F5F9; border-radius:4px; padding:8px 10px; font-size:0.73rem; color:#334155; line-height:1.55;">
-                        <div>- <b>예상 정점 윈도우:</b> {proj["peak_window_min"]} ~ {proj["peak_window_max"]}</div>
-                        <div>- <b>평균 정점 예상일:</b> {proj["peak_window_avg"]} (2029년 4분기)</div>
-                        <div>- <b>본격 폭등 지속 기간:</b> {proj["parabolic_duration_months"]}개월 (전체 {proj["total_cycle_duration_months"]}개월)</div>
-                        <div>- <b>목표가 밴드:</b> ${proj["target_conservative"]:,.0f} ~ ${proj["target_optimistic"]:,.0f} (중립 ${proj["target_median"]:,.0f})</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        ''',
-        unsafe_allow_html=True
-    )
+        with c3:
+            card3_html = (
+                '<div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:12px 14px; min-height:245px; display:flex; flex-direction:column; justify-content:space-between; box-sizing:border-box;">'
+                '<div>'
+                '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:6px;">'
+                '<span style="font-size:0.85rem; font-weight:700; color:#0F172A;">3. 상승 지속 및 최종 정점</span>'
+                '<span style="background:#7C3AED; color:#FFFFFF; font-size:0.70rem; font-weight:700; padding:2px 7px; border-radius:3px; white-space:nowrap;">'
+                '정점 도달 예측'
+                '</span>'
+                '</div>'
+                '<div style="font-size:0.76rem; color:#475569; line-height:1.45; margin-bottom:10px;">'
+                '역대 2~4차 사이클의 반감기 후 최고점 도달 일수(525일, 548일, 534일)는 평균 536일(약 17.5~18개월)에 정밀하게 수렴합니다.'
+                '</div>'
+                '</div>'
+                '<div style="background:#F1F5F9; border-radius:4px; padding:8px 10px; font-size:0.73rem; color:#334155; line-height:1.55;">'
+                f'<div>- <b>예상 정점 윈도우:</b> {proj["peak_window_min"]} ~ {proj["peak_window_max"]}</div>'
+                f'<div>- <b>평균 정점 예상일:</b> {proj["peak_window_avg"]} (2029년 4분기)</div>'
+                f'<div>- <b>본격 폭등 지속 기간:</b> {proj["parabolic_duration_months"]}개월 (전체 {proj["total_cycle_duration_months"]}개월)</div>'
+                f'<div>- <b>목표가 밴드:</b> ${proj["target_conservative"]:,.0f} ~ ${proj["target_optimistic"]:,.0f} (중립 ${proj["target_median"]:,.0f})</div>'
+                '</div>'
+                '</div>'
+            )
+            st.markdown(card3_html, unsafe_allow_html=True)
 
     with st.expander("[역대 4개 사이클 vs 현재 사이클 벤치마크 비교 분석표]", expanded=False):
         st.dataframe(proj["comparison_df"], use_container_width=True)
@@ -6902,46 +6901,58 @@ def render_btc_regime_tab():
     strat_m = metrics.get("Regime Switching Strategy (OOS)", {})
     bnh_m = metrics.get("Buy and Hold (OOS)", {})
 
-    st.markdown(
-        f'''
-        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:16px; margin-bottom:16px; box-sizing:border-box;">
-            <!-- Header -->
-            <div style="margin-bottom:12px;">
-                <div style="font-size:0.88rem; font-weight:700; color:#1E293B;">
-                    [실전 워크포워드 성과 비교: HMM 레짐 스위칭 전략 vs 단순 보유(Buy & Hold)]
-                </div>
-                <div style="font-size:0.75rem; color:#64748B; margin-top:2px;">
-                    전략 규칙: Bull(1) 국면 익일 100% 롱 포지션 진입, Bear(0) 국면 전량 현금(0%) 매도 관망
-                </div>
-            </div>
+    with st.container(border=True):
+        st.markdown(
+            '<div style="margin-bottom:10px;">'
+            '<div style="font-size:0.88rem; font-weight:700; color:#1E293B;">'
+            '[실전 워크포워드 성과 비교: HMM 레짐 스위칭 전략 vs 단순 보유(Buy & Hold)]'
+            '</div>'
+            '<div style="font-size:0.75rem; color:#64748B; margin-top:2px;">'
+            '전략 규칙: Bull(1) 국면 익일 100% 롱 포지션 진입, Bear(0) 국면 전량 현금(0%) 매도 관망'
+            '</div>'
+            '</div>',
+            unsafe_allow_html=True
+        )
 
-            <!-- 4 Metric Cards in CSS Grid -->
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px;">
-                <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:10px 12px; text-align:center; box-sizing:border-box;">
-                    <div style="font-size:0.72rem; color:#64748B; font-weight:600;">연평균 복리 수익률 (CAGR)</div>
-                    <div style="font-size:1.10rem; font-weight:800; color:#2563EB; margin:4px 0;">{strat_m.get("CAGR", "-")}</div>
-                    <div style="font-size:0.70rem; color:#94A3B8;">단순보유: {bnh_m.get("CAGR", "-")}</div>
-                </div>
-                <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:10px 12px; text-align:center; box-sizing:border-box;">
-                    <div style="font-size:0.72rem; color:#64748B; font-weight:600;">최대 낙폭 (MDD, 하락 방어)</div>
-                    <div style="font-size:1.10rem; font-weight:800; color:#16A34A; margin:4px 0;">{strat_m.get("MDD", "-")}</div>
-                    <div style="font-size:0.70rem; color:#DC2626;">단순보유: {bnh_m.get("MDD", "-")}</div>
-                </div>
-                <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:10px 12px; text-align:center; box-sizing:border-box;">
-                    <div style="font-size:0.72rem; color:#64748B; font-weight:600;">샤프 지수 (Sharpe Ratio)</div>
-                    <div style="font-size:1.10rem; font-weight:800; color:#0F172A; margin:4px 0;">{strat_m.get("Sharpe", "-")}</div>
-                    <div style="font-size:0.70rem; color:#94A3B8;">단순보유: {bnh_m.get("Sharpe", "-")}</div>
-                </div>
-                <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:10px 12px; text-align:center; box-sizing:border-box;">
-                    <div style="font-size:0.72rem; color:#64748B; font-weight:600;">누적 수익률 (Total Return)</div>
-                    <div style="font-size:1.10rem; font-weight:800; color:#2563EB; margin:4px 0;">{strat_m.get("TotalReturn", "-")}</div>
-                    <div style="font-size:0.70rem; color:#94A3B8;">단순보유: {bnh_m.get("TotalReturn", "-")}</div>
-                </div>
-            </div>
-        </div>
-        ''',
-        unsafe_allow_html=True
-    )
+        p1, p2, p3, p4 = st.columns(4)
+        with p1:
+            st.markdown(
+                f'<div style="background:#F8FAFC; border:1px solid #CBD5E1; border-radius:6px; padding:10px 12px; text-align:center;">'
+                f'<div style="font-size:0.72rem; color:#64748B; font-weight:600;">연평균 복리 수익률 (CAGR)</div>'
+                f'<div style="font-size:1.10rem; font-weight:800; color:#2563EB; margin:4px 0;">{strat_m.get("CAGR", "-")}</div>'
+                f'<div style="font-size:0.70rem; color:#94A3B8;">단순보유: {bnh_m.get("CAGR", "-")}</div>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+        with p2:
+            st.markdown(
+                f'<div style="background:#F8FAFC; border:1px solid #CBD5E1; border-radius:6px; padding:10px 12px; text-align:center;">'
+                f'<div style="font-size:0.72rem; color:#64748B; font-weight:600;">최대 낙폭 (MDD, 하락 방어)</div>'
+                f'<div style="font-size:1.10rem; font-weight:800; color:#16A34A; margin:4px 0;">{strat_m.get("MDD", "-")}</div>'
+                f'<div style="font-size:0.70rem; color:#DC2626;">단순보유: {bnh_m.get("MDD", "-")}</div>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+        with p3:
+            st.markdown(
+                f'<div style="background:#F8FAFC; border:1px solid #CBD5E1; border-radius:6px; padding:10px 12px; text-align:center;">'
+                f'<div style="font-size:0.72rem; color:#64748B; font-weight:600;">샤프 지수 (Sharpe Ratio)</div>'
+                f'<div style="font-size:1.10rem; font-weight:800; color:#0F172A; margin:4px 0;">{strat_m.get("Sharpe", "-")}</div>'
+                f'<div style="font-size:0.70rem; color:#94A3B8;">단순보유: {bnh_m.get("Sharpe", "-")}</div>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+        with p4:
+            st.markdown(
+                f'<div style="background:#F8FAFC; border:1px solid #CBD5E1; border-radius:6px; padding:10px 12px; text-align:center;">'
+                f'<div style="font-size:0.72rem; color:#64748B; font-weight:600;">누적 수익률 (Total Return)</div>'
+                f'<div style="font-size:1.10rem; font-weight:800; color:#2563EB; margin:4px 0;">{strat_m.get("TotalReturn", "-")}</div>'
+                f'<div style="font-size:0.70rem; color:#94A3B8;">단순보유: {bnh_m.get("TotalReturn", "-")}</div>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+
+    st.markdown("<div style='height:4px;'></div>", unsafe_allow_html=True)
 
     # 5. Interactive Plotly Chart
     fig = Visualizer.build_figure(eval_df)
