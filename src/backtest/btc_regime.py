@@ -224,7 +224,7 @@ class WalkForwardValidator:
             eval_end = min(i + self.freq, total_len)
             for step in range(i, eval_end):
                 # t 시점 예측을 위해 t 시점 직전 피처 벡터 전달
-                X_step = df.iloc[step - 1:step][feature_cols].values
+                X_step = df.iloc[max(0, step - 60):step][feature_cols].values
                 pred = current_model.predict_state(X_step)
                 regime_preds[step] = pred
 
@@ -655,7 +655,7 @@ def run_or_load_btc_regime_analysis(
 
     # Check if we have existing cached results for incremental validation
     existing_cached_df = None
-    if os.path.exists(CACHE_FILE_PATH):
+    if not force_refresh and os.path.exists(CACHE_FILE_PATH):
         try:
             prev_df = pd.read_parquet(CACHE_FILE_PATH)
             if not prev_df.empty and "regime" in prev_df.columns:
