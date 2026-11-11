@@ -1,4 +1,4 @@
-﻿# Python virtual environment
+# Python virtual environment
 .venv/
 venv/
 ENV/
@@ -12,6 +12,8 @@ __pycache__/
 # Data cache (exclude heavy parquet cache files)
 data/cache/
 *.parquet
+!data/btc_regime_cache.parquet
+!data/btc_raw_cache.parquet
 
 # Streamlit runtime
 .streamlit/secrets.toml

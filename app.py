@@ -7015,7 +7015,27 @@ def render_btc_regime_tab():
 # =========================================================
 with tab5:
     try:
-        render_btc_regime_tab()
+        cur_nav = st.session_state.get("main_active_tab_nav", main_tab_names[0])
+        is_tab5_active = (cur_nav == main_tab_names[4])
+        tab5_loaded = bool(st.session_state.get("tab5_session_loaded", False))
+
+        if is_tab5_active or tab5_loaded:
+            st.session_state["tab5_session_loaded"] = True
+            render_btc_regime_tab()
+        else:
+            st.markdown(
+                '''
+                <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:20px; text-align:center; margin:16px 0;">
+                    <div style="font-size:0.95rem; font-weight:700; color:#1E293B; margin-bottom:6px;">
+                        [5. 비트코인 탭 대기 모드]
+                    </div>
+                    <div style="font-size:0.78rem; color:#64748B;">
+                        '5. 비트코인' 탭을 선택하시면 HMM 시장 레짐 모델과 동적 사이클 분석이 즉시 로드됩니다.
+                    </div>
+                </div>
+                ''',
+                unsafe_allow_html=True
+            )
     except Exception as _t5_err:
         import traceback
         st.error(f"비트코인 레짐 분석 로딩 중 오류가 발생했습니다: {_t5_err}")

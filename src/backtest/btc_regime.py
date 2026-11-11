@@ -134,7 +134,8 @@ class MarketRegimeModel:
         self.model = GaussianHMM(
             n_components=n_states,
             covariance_type="full",
-            n_iter=150,
+            n_iter=50,
+            tol=1e-3,
             random_state=random_state
         )
         self.scaler = RobustScaler()
@@ -175,10 +176,16 @@ class WalkForwardValidator:
         self.init_train_len = initial_train_years * 365
         self.freq = rebalance_freq_days
 
-    def run(self, df: pd.DataFrame, progress_callback: Optional[Callable[[float, str], None]] = None) -> pd.DataFrame:
+    def run(
+        self,
+        df: pd.DataFrame,
+        existing_df: Optional[pd.DataFrame] = None,
+        progress_callback: Optional[Callable[[float, str], None]] = None
+    ) -> pd.DataFrame:
         """
         Expanding Window 방식으로 시점을 과거로 되돌려 
         '오직 과거 데이터만으로 익일~익주를 예측'하는 실전 검증을 진행합니다.
+        기존 사전 계산된 데이터(existing_df)가 존재할 경우 증분(Incremental) 구간만 효율적으로 계산합니다.
         """
         feature_cols = ["log_ret", "realized_vol", "trend_ratio"]
         total_len = len(df)
@@ -189,7 +196,19 @@ class WalkForwardValidator:
         regime_preds = np.zeros(total_len)
         regime_preds[:] = np.nan
 
-        i = self.init_train_len
+        start_idx = self.init_train_len
+        # Reuse existing regimes if available to eliminate redundant CPU usage
+        if existing_df is not None and not existing_df.empty and "regime" in existing_df.columns:
+            common_idx = df.index.intersection(existing_df.index)
+            if len(common_idx) > self.init_train_len:
+                for dt in common_idx:
+                    loc = df.index.get_loc(dt)
+                    regime_preds[loc] = existing_df.loc[dt, "regime"]
+                valid_locs = np.where(~np.isnan(regime_preds))[0]
+                if len(valid_locs) > 0:
+                    start_idx = max(self.init_train_len, valid_locs[-1] + 1)
+
+        i = start_idx
         current_model = None
 
         while i < total_len:
@@ -634,7 +653,17 @@ def run_or_load_btc_regime_analysis(
         except Exception:
             pass
 
-    # Execute full workflow
+    # Check if we have existing cached results for incremental validation
+    existing_cached_df = None
+    if os.path.exists(CACHE_FILE_PATH):
+        try:
+            prev_df = pd.read_parquet(CACHE_FILE_PATH)
+            if not prev_df.empty and "regime" in prev_df.columns:
+                existing_cached_df = prev_df
+        except Exception:
+            pass
+
+    # Execute workflow (incremental if previous cache exists)
     if progress_callback:
         progress_callback(0.05, "비트코인 과거 시세 다운로드 중...")
 
@@ -642,10 +671,10 @@ def run_or_load_btc_regime_analysis(
     feature_data = DataPipeline.build_features(raw_data)
 
     if progress_callback:
-        progress_callback(0.15, "HMM 2-State 워크포워드 검증 시작 (Expanding Window)...")
+        progress_callback(0.15, "HMM 2-State 워크포워드 증분 검증 시작 (Expanding Window)...")
 
     validator = WalkForwardValidator(initial_train_years=3, rebalance_freq_days=7)
-    validated_df = validator.run(feature_data, progress_callback=progress_callback)
+    validated_df = validator.run(feature_data, existing_df=existing_cached_df, progress_callback=progress_callback)
 
     metrics, evaluated_df = PerformanceEvaluator.evaluate(validated_df)
 
