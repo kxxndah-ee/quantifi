@@ -8,6 +8,7 @@ and optional Gemini GenAI API.
 import os
 import json
 import logging
+from datetime import datetime
 from typing import Dict, Any, List, Optional
 import requests
 
@@ -34,9 +35,19 @@ def generate_quant_expert_answer(
         cat = str(stock_info.get("market_macro_category") or detect_market_macro_intent(question).get("category", "general"))
         return generate_market_macro_answer(question, category=cat, api_key=api_key, chat_history=chat_history)
 
+    is_valid_stock = bool(stock_info and str(stock_info.get("code") or "").strip().isdigit())
     macro_intent = detect_market_macro_intent(question or "")
-    if macro_intent.get("is_market_macro") and not extract_all_stocks_from_query(question or ""):
-        return generate_market_macro_answer(question, category=macro_intent.get("category", "general"), api_key=api_key, chat_history=chat_history)
+    if macro_intent.get("is_market_macro"):
+        explicit_macro_words = [
+            "코스피", "코스닥", "지수", "증시", "시장", "국내장", "미국", "나스닥", "s&p", "환율", "달러",
+            "금리", "연준", "유가", "vix", "매크로", "거시", "인플레", "글로벌"
+        ]
+        q_lower_check = (question or "").lower()
+        has_explicit_macro = any(w in q_lower_check for w in explicit_macro_words)
+        matched_stocks = extract_all_stocks_from_query(question or "")
+
+        if not is_valid_stock or (has_explicit_macro and not matched_stocks):
+            return generate_market_macro_answer(question, category=macro_intent.get("category", "general"), api_key=api_key, chat_history=chat_history)
 
     stocks_list: List[Dict[str, Any]] = []
     if compare_stocks and len(compare_stocks) >= 2:
@@ -136,6 +147,7 @@ def _call_gemini_quant_expert(
             f"- 전일대비 거래량 배수: {vol_ratio:.2f}배 | RSI(14): {rsi:.1f} | 이평선: {ma_status} ({ma_pos_desc})\n"
             f"- 최근 20일 고점 대비 낙폭: {dd20:.1f}%\n"
             f"- 목표 익절가: {tp_price:,.0f}원 (+{tp_pct:.1f}%) | 손절 기준가: {sl_price:,.0f}원 (-{sl_pct:.1f}%)\n"
+            f"- 현시각 실시간 동적 추가 상승 룸: +{calculate_intraday_dynamic_upside(s_info)['room']:.1f}% (단기 타겟가 {calculate_intraday_dynamic_upside(s_info)['target_price']:,.0f}원)\n"
             f"- 핵심 근거: {reason_core} | 체결 원칙: {rule_note}\n"
         )
 
@@ -230,6 +242,137 @@ def _call_gemini_quant_expert(
     raise RuntimeError(f"Gemini API call failed across models: {last_error_text}")
 
 
+def round_krx_tick(p: float) -> float:
+    """KRX standard tick-size price rounding."""
+    if p >= 500000:
+        return round(p / 1000.0) * 1000.0
+    elif p >= 200000:
+        return round(p / 500.0) * 500.0
+    elif p >= 50000:
+        return round(p / 100.0) * 100.0
+    elif p >= 20000:
+        return round(p / 50.0) * 50.0
+    elif p >= 5000:
+        return round(p / 10.0) * 10.0
+    elif p >= 2000:
+        return round(p / 5.0) * 5.0
+    elif p >= 1:
+        return max(1.0, round(p))
+    return max(1.0, round(p))
+
+
+def calculate_intraday_dynamic_upside(
+    stock_info: Dict[str, Any],
+    current_dt: Optional[datetime] = None
+) -> Dict[str, Any]:
+    """
+    Computes a multi-factor, time-decay-adjusted, real-time upside potential (기대 상승률/상승 여력, %).
+    Dynamically scales based on:
+    1. KRX Daily Circuit Limit (+30% from prev_close) ceiling.
+    2. Stock-specific momentum potential (score, vol_ratio, rsi, ma_status).
+    3. Session and Intraday Time Decay (현시각 반영, 09:00~15:30 non-linear decay curve).
+    4. Intraday price action (candle support, upper shadow, distance to resistance).
+    5. Mega-cap volatility dampening (prevents unrealistic +8% intraday moves on mega caps).
+    """
+    close = _safe_to_float(stock_info.get("close"), 0.0)
+    change_pct = _safe_to_float(stock_info.get("change_pct"), 0.0)
+    open_p = _safe_to_float(stock_info.get("open"), close)
+    high_p = _safe_to_float(stock_info.get("high"), close)
+    low_p = _safe_to_float(stock_info.get("low"), close)
+    prev_close = _safe_to_float(stock_info.get("prev_close"), 0.0)
+    if prev_close <= 0:
+        prev_close = close / (1.0 + change_pct / 100.0) if (close > 0 and abs(change_pct) > 0.01) else close
+
+    score = _safe_to_float(stock_info.get("score"), 55.0)
+    breakdown = stock_info.get("breakdown") or {}
+    if not isinstance(breakdown, dict):
+        breakdown = {}
+    vol_ratio = _safe_to_float(breakdown.get("vol_ratio", stock_info.get("vol_ratio")), 1.0)
+    rsi = _safe_to_float(breakdown.get("rsi_val", stock_info.get("rsi")), 50.0)
+    ma_status = str(breakdown.get("ma_status") or stock_info.get("ma_status") or "")
+    name = str(stock_info.get("name") or "")
+
+    # 1. Circuit limit (+30% KRX ceiling)
+    limit_price = prev_close * 1.30 if prev_close > 0 else close * 1.30
+    max_circuit_room = max(0.0, ((limit_price - close) / close * 100.0)) if close > 0 else 30.0
+
+    # 2. Base momentum upside potential
+    base_gain = 1.0 + (score * 0.05)
+    vol_boost = min(2.5, max(0.0, (vol_ratio - 1.0) * 0.8))
+    ma_boost = 0.8 if "정배열" in ma_status else (0.3 if any(w in ma_status for w in ["밀집", "수렴"]) else (-0.6 if "역배열" in ma_status else 0.0))
+    rsi_boost = 0.6 if 48.0 <= rsi <= 68.0 else (-0.7 if rsi > 75.0 else (-0.5 if rsi < 35.0 else 0.0))
+    full_day_potential = max(1.2, base_gain + vol_boost + ma_boost + rsi_boost)
+
+    # 3. Session & Time Decay Factor
+    if current_dt is None:
+        try:
+            from src.database.models import get_now_kst
+            current_dt = get_now_kst()
+        except Exception:
+            current_dt = datetime.now()
+
+    now_h = current_dt.hour
+    now_m = current_dt.minute
+    now_mins = now_h * 60 + now_m
+
+    if now_mins < 540:  # Before 09:00
+        time_factor = 1.0
+        time_label = "정규장 개장 전(장전)"
+    elif now_mins >= 930:  # After 15:30
+        time_factor = 1.0
+        time_label = "장마감 후(익일 세션 기준)"
+    else:
+        rem_mins = 930 - now_mins
+        time_ratio = rem_mins / 390.0
+        time_factor = max(0.12, min(0.98, 0.10 + 0.90 * (time_ratio ** 0.80)))
+        if now_h >= 14 and now_m >= 30:
+            time_label = f"장마감 직전({now_h:02d}:{now_m:02d})"
+        elif now_h >= 13:
+            time_label = f"오후장({now_h:02d}:{now_m:02d})"
+        elif now_h >= 11 and now_m >= 30:
+            time_label = f"점심·오후진입({now_h:02d}:{now_m:02d})"
+        else:
+            time_label = f"오전장({now_h:02d}:{now_m:02d})"
+
+    # 4. Intraday price action & resistance distance
+    day_range = max(1.0, high_p - low_p)
+    candle_support_pct = ((close - low_p) / day_range * 100.0) if day_range > 0 else 50.0
+    body_top = max(open_p, close)
+    upper_shadow_pct = ((high_p - body_top) / open_p * 100.0) if open_p > 0 else 0.0
+
+    if candle_support_pct >= 75.0 and upper_shadow_pct < 1.2:
+        pa_mult = 1.15
+    elif upper_shadow_pct >= 2.5 or candle_support_pct < 40.0:
+        pa_mult = 0.75
+    else:
+        pa_mult = 0.95
+
+    # Mega-cap dampener
+    if any(k in name for k in ["삼성전자", "SK하이닉스", "LG에너지", "현대차", "기아", "POSCO", "NAVER", "카카오"]):
+        pa_mult *= 0.75
+
+    pivot_p = (high_p + low_p + close) / 3.0 if (high_p > 0 and low_p > 0 and close > 0) else close
+    resist_1 = max(high_p if high_p > close else close * 1.015, pivot_p * 1.01) if close > 0 else 0.0
+    dist_to_resist = max(0.5, ((resist_1 - close) / close * 100.0)) if close > 0 else 2.0
+
+    raw_room = (full_day_potential * time_factor * pa_mult * 0.65) + (min(dist_to_resist * 1.5, full_day_potential) * time_factor * 0.35)
+    dynamic_room = round(max(0.4, min(max_circuit_room, raw_room)), 1)
+    target_price = round_krx_tick(close * (1.0 + dynamic_room / 100.0)) if close > 0 else 0.0
+
+    return {
+        "room": dynamic_room,
+        "target_price": target_price,
+        "time_label": time_label,
+        "time_factor": round(time_factor, 2),
+        "full_day_potential": round(full_day_potential, 1),
+        "max_circuit_room": round(max_circuit_room, 1),
+        "resist_1": resist_1,
+        "candle_support_pct": round(candle_support_pct, 1),
+        "upper_shadow_pct": round(upper_shadow_pct, 1),
+        "is_limit_near": bool(max_circuit_room <= 2.5),
+    }
+
+
 def _built_in_quant_reasoning(
     stock_info: Dict[str, Any],
     question: str,
@@ -318,19 +461,16 @@ def _built_in_quant_reasoning(
     }
     is_custom_query = q_clean not in preset_prompts
 
-    # 1. 오후장 / 1시 이후 / 2시 이후 / 장후반 / 현시각 이후 / 추가 상승 여력 / 얼마나 더 갈까
+    # 1. 오후장 / 현시각 이후 / 실시간 기대 상승률 / 추가 상승 여력 / 얼마나 더 갈까 / 상승폭
     if any(k in q_lower for k in [
         "오후", "오후장", "장후반", "1시", "2시", "3시", "12시", "점심", "마감", "장마감", "종가",
-        "현시각", "현 시각", "현재 시각", "현재시각", "지금부터",
+        "현시각", "현 시각", "현재 시각", "현재시각", "지금부터", "지금 이후", "현시점",
+        "상승율", "상승률", "상승 폭", "상승폭", "기대수익", "기대수익률", "기대 수익률",
+        "목표수익률", "목표 수익률", "예상 상승률", "예상상승률", "예상 수익률", "예상수익률", "목표 상승률",
         "여력", "상승 여력", "상승여력", "추가 상승", "추가상승", "더 오를", "더 갈",
         "얼마나 더", "상승 가능성", "상승가능성", "상승 확률", "상승확률", "오를 가능성", "오를 확률",
-        "더 갈까", "더 오를까", "슈팅"
+        "더 갈까", "더 오를까", "슈팅", "얼마나 오를", "얼마나 갈", "어디까지 갈", "어디까지 오를"
     ]):
-        cm = _compute_complex_quant_metrics(stock_info, q_clean)
-        aft_score = cm["afternoon_score"]
-        aft_room = max(1.2, round(tp_pct * 0.75, 1))
-        aft_target_price = close * (1.0 + aft_room / 100.0) if close > 0 else 0.0
-
         try:
             from src.database.models import get_now_kst
             now_kst = get_now_kst()
@@ -362,34 +502,47 @@ def _built_in_quant_reasoning(
         else:
             target_time_label = f"현시각({now_hm}) 이후" if now_h >= 12 else f"현시각({now_hm}) 기준"
 
-        if now_h >= 14 and now_m >= 30:
-            timing_scenario = f"장마감(15:30) 직전까지 추가 탄력 및 동시호가(15:20~15:30) 종가배팅 수급 유입 가능성이 높습니다."
-            timing_action = f"15:20 이전 1차 목표가(**{tp_price:,.0f}원**) 도달 시 분할 익절하고, 장마감 직전 원칙 손절선(**{sl_price:,.0f}원**, -{sl_pct:.1f}%) 이탈 시에는 오버나잇을 지양하고 기계적으로 정리하십시오."
-        elif now_h >= 13:
-            timing_scenario = f"14:30 전후 2차 수급 및 장마감 종가배팅 자금 유입 확률이 74% 이상으로 높습니다."
-            timing_action = f"오후 14:30 전후 거래량 재유입과 함께 당일 고가권(**{resist_1:,.0f}원**) 돌파 시 목표가 **{tp_price:,.0f}원**까지 홀딩을 권장합니다. 만약 14:30 이후 **{sl_price:,.0f}원(-{sl_pct:.1f}%)**을 하향 이탈할 경우 종가 투매 리스크 차단을 위해 원칙 손절로 대응하십시오."
-        else:
-            timing_scenario = f"13:30 이후 2차 수급 및 종가배팅 자금 유입 확률이 74% 이상으로 높습니다."
-            timing_action = f"오후장 피벗 중심선(**{pivot_price:,.0f}원**) 및 1차 지지선(**{support_1:,.0f}원**) 상단 안착 시 분할 접근, 당일 고가권(**{resist_1:,.0f}원**) 거래량 동반 돌파 시 목표가 **{tp_price:,.0f}원**까지 홀딩 권장합니다. 오후 14:30 이후 **{sl_price:,.0f}원(-{sl_pct:.1f}%)** 이탈 시에는 원칙 손절로 대응하십시오."
+        cm = _compute_complex_quant_metrics(stock_info, q_clean)
+        aft_score = cm["afternoon_score"]
 
-        if aft_score >= 70.0:
+        # Calculate scientifically grounded dynamic upside potential
+        dyn_upside = calculate_intraday_dynamic_upside(stock_info, current_dt=now_kst)
+        aft_room = dyn_upside["room"]
+        aft_target_price = dyn_upside["target_price"]
+        max_circuit_room = dyn_upside["max_circuit_room"]
+        time_factor = dyn_upside["time_factor"]
+        is_limit_near = dyn_upside["is_limit_near"]
+
+        if now_h >= 14 and now_m >= 30:
+            timing_scenario = f"장마감(15:30) 직전까지 추가 탄력 및 동시호가(15:20~15:30) 종가배팅 수급 유입 가능성이 있습니다."
+            timing_action = f"15:20 이전 목표가(**{aft_target_price:,.0f}원**) 도달 시 분할 익절하고, 장마감 직전 원칙 손절선(**{sl_price:,.0f}원**, -{sl_pct:.1f}%) 이탈 시에는 오버나잇을 지양하고 기계적으로 정리하십시오."
+        elif now_h >= 13:
+            timing_scenario = f"14:30 전후 2차 수급 및 장마감 종가배팅 자금 유입 여부가 중요합니다."
+            timing_action = f"오후 14:30 전후 거래량 재유입과 함께 당일 고가권(**{resist_1:,.0f}원**) 돌파 시 목표가 **{aft_target_price:,.0f}원**까지 홀딩을 권장합니다. 만약 14:30 이후 **{sl_price:,.0f}원(-{sl_pct:.1f}%)**을 하향 이탈할 경우 종가 투매 리스크 차단을 위해 원칙 손절로 대응하십시오."
+        else:
+            timing_scenario = f"장중 2차 수급 및 저항선 돌파 모멘텀이 상방 룸을 결정합니다."
+            timing_action = f"피벗 중심선(**{pivot_price:,.0f}원**) 및 1차 지지선(**{support_1:,.0f}원**) 상단 안착 시 분할 접근, 당일 고가권(**{resist_1:,.0f}원**) 거래량 동반 돌파 시 목표가 **{aft_target_price:,.0f}원**까지 분할 대응 권장합니다. **{sl_price:,.0f}원(-{sl_pct:.1f}%)** 이탈 시에는 원칙 손절로 대응하십시오."
+
+        limit_warning = f" (주의: 상한가 잔여 룸 +{max_circuit_room:.1f}% 근접 과열 구간)" if is_limit_near else ""
+
+        if aft_score >= 70.0 and aft_room >= 2.0:
             aft_grade = f"충분·상방 룸 우위 (상승 탄력 {aft_score:.1f}점 / 100점 · 수급 유입 우세)"
             aft_direct = (
-                f"**{name}은 {target_time_label} 약 +{aft_room:.1f}% 내외(목표 약 {aft_target_price:,.0f}원)의 추가 상승 여력이 충분합니다.** "
-                f"장중 고점 지지력({candle_support_pct:.0f}%)과 전일비 {vol_ratio:.1f}배의 메이저 수급이 탄탄하여 {timing_scenario} "
+                f"**{name}은 {target_time_label} 동적 계산 기준 약 +{aft_room:.1f}% 내외(목표 약 {aft_target_price:,.0f}원)의 추가 상승 여력이 유효합니다.{limit_warning}** "
+                f"장중 고점 지지력({candle_support_pct:.0f}%)과 전일비 {vol_ratio:.1f}배의 메이저 수급이 뒷받침되어 {timing_scenario} "
                 f"단, 1차 지지선인 {support_1:,.0f}원(손절 기준 {sl_price:,.0f}원, -{sl_pct:.1f}%) 이탈 시에는 오후장 윗꼬리 차익실현에 대비하십시오."
             )
         elif aft_score >= 52.0:
             aft_grade = f"보통~완만한 우위 (상승 탄력 {aft_score:.1f}점 / 100점 · 지지선 확인 필요)"
             aft_direct = (
-                f"**{name}은 {target_time_label} +{aft_room:.1f}% 내외의 완만한 추가 상승 여력은 열려 있으나, 당일 고점 매물 소화가 선행되어야 합니다.** "
+                f"**{name}은 {target_time_label} 약 +{aft_room:.1f}% 내외(목표 약 {aft_target_price:,.0f}원)의 완만한 추가 상승 여력은 열려 있으나, 당일 고점 매물 소화가 선행되어야 합니다.{limit_warning}** "
                 f"1차 지지선({support_1:,.0f}원) 안착과 분봉 거래량 재유입을 확인한 뒤 분할 접근하는 것이 유리하며, "
                 f"{sl_price:,.0f}원 하향 이탈 시에는 무리한 홀딩을 피하십시오."
             )
         else:
             aft_grade = f"제한적·과열 주의 (상승 탄력 {aft_score:.1f}점 / 100점 · 고점 매물 출회 구간)"
             aft_direct = (
-                f"**{name}은 {target_time_label} 추가 상승 여력이 제한적이며(상승 확률 {aft_score:.1f}점), 오후장 차익실현 윗꼬리 출회 위험이 큽니다.** "
+                f"**{name}은 {target_time_label} 추가 상승 여력이 약 +{aft_room:.1f}%(목표 약 {aft_target_price:,.0f}원) 수준으로 제한적이며(상승 탄력 {aft_score:.1f}점), 차익실현 윗꼬리 출회 위험이 큽니다.** "
                 f"현재 위치에서의 불타기 신규 진입은 자제하고 보수적 관망을 권고하며, "
                 f"보유자는 {sl_price:,.0f}원(-{sl_pct:.1f}%) 이탈 시 종가 투매 리스크를 차단하기 위해 비중 축소로 대응하십시오."
             )
@@ -399,12 +552,13 @@ def _built_in_quant_reasoning(
 ### **{name} ({code}) {target_time_label} 상승 여력 퀀트 정밀 진단**
 
 - **질문 분석**: `{q_clean}`
-- **퀀트 산출 결과값 (오후장 상승 판정)**: **{aft_grade}**
+- **퀀트 산출 결과값 ({target_time_label} 상승 판정)**: **{aft_grade}**
   - **상승 탄력 점수**: **{aft_score:.1f}점 / 100점** (종합 퀀트 스코어 **{score:.1f}점 · {label}**)
-  - **추가 상승 기대 룸**: **+{aft_room:.1f}%** (단기 타겟가 **약 {aft_target_price:,.0f}원**)
+  - **{target_time_label} 기대 상승률 (동적 상방 룸)**: **+{aft_room:.1f}%** (단기 타겟가 **약 {aft_target_price:,.0f}원**)
+  - **실시간 산출 근거 (시간 가중치 & 상한가 룸)**: 잔여시간 가중치 **{time_factor:.2f}x** | 상한가 잔여 룸: **+{max_circuit_room:.1f}%**
   - **장중 고가 지지력 (캔들 실체 위치)**: **{candle_support_pct:.1f}%** (시가 **{open_p:,.0f}원** / 고가 **{high_p:,.0f}원** / 현재가 **{close:,.0f}원**)
   - **수급 에너지 및 거래량 배수**: 전일 대비 **{vol_ratio:.2f}배** (추정 거래대금 **약 {est_val_eok:,.1f}억원**)
-  - **핵심 대응 타점**: 1차 지지선 **{support_1:,.0f}원** | 돌파 기준선 **{resist_1:,.0f}원** | 목표 익절가 **{tp_price:,.0f}원 (+{tp_pct:.1f}%)** / 손절가 **{sl_price:,.0f}원 (-{sl_pct:.1f}%)**
+  - **핵심 대응 타점**: 1차 지지선 **{support_1:,.0f}원** | 돌파 기준선 **{resist_1:,.0f}원** | 목표 익절가 **{aft_target_price:,.0f}원 (+{aft_room:.1f}%)** / 원칙 손절가 **{sl_price:,.0f}원 (-{sl_pct:.1f}%)**
 
 **1. 수급 및 캔들 구조 해석 ({target_time_label})**
 - 추가 상승의 핵심 조건인 **장중 고점 지지율(캔들 실체 지지력)**이 현재 **{candle_support_pct:.1f}%**를 기록 중입니다. { '일중 고가 부근에서 차익 매물을 소화하며 탄탄하게 가격을 방어하고 있어 ' + ('장마감 직전 종가배팅 수급 유입 가능성이 높습니다.' if now_h >= 14 and now_m >= 30 else '추가 수급 유입 가능성이 높습니다.') if candle_support_pct >= 60 else '장중 고점 대비 밀리며 윗꼬리 매물 부담이 일부 존재하므로, 성급한 추격매수보다는 1차 지지선 방어 여부를 먼저 확인해야 합니다.' }
@@ -776,7 +930,8 @@ def _built_in_quant_reasoning(
     ]):
         gap_normal_min = close * 1.005
         gap_normal_max = close * 1.025
-        gap_overheat = close * 1.038
+        overheat_gap_pct = round(max(3.0, min(5.5, tp_pct * 0.75)), 1)
+        gap_overheat = close * (1.0 + overheat_gap_pct / 100.0)
         gap_fail_line = max(sl_price, close * 0.985)
 
         if score >= 75.0 and vol_ratio >= 1.5:
@@ -811,7 +966,7 @@ def _built_in_quant_reasoning(
 - **퀀트 산출 결과값 (프리마켓/시외 판정)**: **{pm_verdict}**
   - **현재 기준가 / 등락률**: **{close:,.0f}원** ({change_pct:+.2f}%) | 업종: **[{sector}]**
   - **적정 시초가 형성 밴드**: **{gap_normal_min:,.0f}원 ~ {gap_normal_max:,.0f}원** (`+0.5% ~ +2.5%` 건전한 갭 출발 구간)
-  - **시초 추격 절대 금지선**: **{gap_overheat:,.0f}원 이상** (`+3.8%` 이상 과대 갭 출발 시 윗꼬리 장대음봉 위험 70%)
+  - **시초 추격 절대 금지선**: **{gap_overheat:,.0f}원 이상** (`+{overheat_gap_pct:.1f}%` 이상 과대 갭 출발 시 윗꼬리 장대음봉 위험 70%)
   - **시초 갭메우기 마지노선**: **{gap_fail_line:,.0f}원** (시초가 이탈 시 전일 종가 및 1차 지지선까지 급락 경계)
   - **1차 목표 익절가**: **{tp_price:,.0f}원 (+{tp_pct:.1f}%)** | **원칙 손절가**: **{sl_price:,.0f}원 (-{sl_pct:.1f}%)**
 
@@ -828,7 +983,7 @@ def _built_in_quant_reasoning(
   - 조건: 시초가 출발 후 09:05 이내에 시초가를 하향 이탈하며 분봉 음봉이 발생할 때.
   - 실행: 전일 종가(**{prev_close:,.0f}원**) 또는 1차 피벗 지지선(**{support_1:,.0f}원**)까지 갭을 메우는 조정을 거칩니다. 성급한 물타기/신규 매수를 전면 보류하고, **{support_1:,.0f}원** 부근에서 하방 경직성을 확인한 뒤 2차 진입을 타진하십시오.
 - **시나리오 C (과대 갭상승 후 급락 - 확률 15% - 추격 절대 금지)**:
-  - 조건: 시초가가 **+{3.8:.1f}% 이상** 과도하게 갭을 띄워 출발할 때.
+  - 조건: 시초가가 **+{overheat_gap_pct:.1f}% 이상** 과도하게 갭을 띄워 출발할 때.
   - 실행: 신규 매수는 100% 금지(뇌동매매 방지). 기존 보유자는 09:00~09:05 시초 고가권에서 보유 비중의 **50%~70% 이상을 기계적으로 분할 매도**하여 수익을 실현하십시오.
 
 **3. 시간대별 실전 체크리스트**
