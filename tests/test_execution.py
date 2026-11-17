@@ -27,6 +27,12 @@ class TestExecution(unittest.TestCase):
         self.assertTrue(feasible)
         self.assertEqual(reason, "FEASIBLE")
 
+    def test_gap_down_rejection(self):
+        # -2.0% gap open -> rejected
+        feasible, reason = is_trade_feasible(prev_close=10000, next_open=9800)
+        self.assertFalse(feasible)
+        self.assertEqual(reason, "GAP_DOWN_EXCEEDS_1_5PCT")
+
     def test_cost_calculation(self):
         # 10,000 -> 10,300 (+3.0% gross)
         res = calculate_net_trade_return(10000, 10300, avg_daily_val=10_000_000_000)

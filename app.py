@@ -2792,7 +2792,7 @@ def get_stock_factsheet_payload(code: str) -> Dict[str, Any]:
         tp_pct = 5.0
         sl_pct = 2.5
         reason_core = "장중 거래대금 급증 및 주도 수급 유입으로 당일 내 변동성 상방 확장 조건 충족"
-        rule_note = "장중 목표가(+5%) 도달 시 50% 분할 익절, 잔여분 +1.8% 트레일링 락. 당일 15:20 미체결 시 전량 청산"
+        rule_note = "1단계: 시초 갭하락(-0.8% 이하) 시 취소 | 2단계: +2.0%~+2.5% 도달 시 50% 분할익절 & 본전스탑 | 3단계: 장중 +5% 목표 익절 / 15:15 종가 전량 청산 (손절 -2.5%)"
     elif is_surge_5pct:
         strategy_tag = "5% 급등 타겟 (1~2일 스윙)"
         tp_pct = 5.0
@@ -4384,6 +4384,35 @@ with tab1:
 
     st.markdown(f'<div class="sc-mode-tag-desc" style="font-size:0.80rem; line-height:1.55; color:#475569; padding:4px 0 6px 2px; margin:0; overflow:visible;">{m_tag}</div>', unsafe_allow_html=True)
 
+    try:
+        from src.core.high_winrate_strategies import evaluate_market_regime
+        from src.collectors.market_data import get_benchmark_ohlcv
+        _bm_df = get_benchmark_ohlcv()
+        _is_bull, _regime_msg, _regime_meta = evaluate_market_regime(_bm_df)
+        if not _is_bull:
+            st.markdown('''
+<div style="background-color:#FEF2F2; border-left:4px solid #EF4444; padding:10px 14px; border-radius:6px; margin:8px 0 12px 0;">
+    <div style="display:flex; align-items:center; justify-content:space-between;">
+        <span style="font-weight:700; color:#991B1B; font-size:0.88rem;">시장 체제 경고: 코스피 200 지수 하락/조정 국면 (KODEX 200 &lt; 20일선)</span>
+        <span style="background-color:#FEE2E2; color:#B91C1C; font-weight:700; font-size:0.75rem; padding:2px 8px; border-radius:4px;">보수적 방어 모드 가동</span>
+    </div>
+    <div style="font-size:0.78rem; color:#7F1D1D; margin-top:4px; line-height:1.45;">
+        지수가 단기 하락 추세에 있으므로 신규 매수 시 리스크가 증가합니다. <b>원칙 3대 수칙:</b> ① 시초가 갭하락(-0.8% 이하) 종목 당일 진입 취소 ② 1차 익절(+1.8%~+2.5%) 도달 시 50% 분할 익절 및 본전 스탑로스 설정 ③ 원칙 손절선(-2.0%) 철저 준수.
+    </div>
+</div>
+''', unsafe_allow_html=True)
+        else:
+            st.markdown('''
+<div style="background-color:#F0FDF4; border-left:4px solid #10B981; padding:8px 14px; border-radius:6px; margin:8px 0 12px 0;">
+    <div style="display:flex; align-items:center; justify-content:space-between;">
+        <span style="font-weight:700; color:#065F46; font-size:0.86rem;">시장 체제 양호: 코스피 200 지수 상승 추세 (KODEX 200 &ge; 20일선)</span>
+        <span style="background-color:#DCFCE7; color:#047857; font-weight:700; font-size:0.75rem; padding:2px 8px; border-radius:4px;">매수 적극 허용</span>
+    </div>
+</div>
+''', unsafe_allow_html=True)
+    except Exception:
+        pass
+
     # 전 전략 모드 공통: 시간대별 최적 권장 설정 자동화 엔진
     def get_auto_time_recommendation_for_strategy(strategy_mode, dt=None):
         if dt is None:
@@ -5527,7 +5556,9 @@ with tab1:
                         st.markdown(f"**스코어 {srow['score']:.1f}점** ({srow['label']})")
                         st.progress(min(1.0, max(0.0, srow["score"] / 100.0)))
                         st.caption(f"목표: +{srow['tp_pct']:.1f}% | 손절: -{srow['sl_pct']:.1f}%")
-                        st.caption(f"{srow.get('rule_note', '')}")
+                        _rule_txt = srow.get('rule_note', '')
+                        if _rule_txt:
+                            st.markdown(f"<div style='background-color:#F8FAFC; border:1px solid #E2E8F0; border-radius:4px; padding:5px 8px; font-size:0.75rem; color:#334155; margin:4px 0 6px 0; line-height:1.4;'><strong>매매 원칙</strong>: {_rule_txt}</div>", unsafe_allow_html=True)
 
                         with st.expander("선정 이유 및 팩트체크", expanded=False):
                             st.markdown(f"<div style='font-size:0.80rem; line-height:1.4; margin-bottom:6px;'><strong>핵심 근거</strong>: {srow.get('reason_core', '조건 충족')}</div>", unsafe_allow_html=True)

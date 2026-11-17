@@ -203,6 +203,16 @@ def calculate_score_for_row(row: pd.Series, weights: Optional[Dict[str, float]] 
     if ma20 > 0 and close < ma20:
         penalty += 10.0
 
+    # Overbought & Parabolic Expiry Penalty: prevent chasing at the extreme top
+    disparity = (close / ma20 * 100.0) if ma20 > 0 else 100.0
+    if disparity >= 115.0:
+        penalty += 18.0
+    elif disparity >= 110.0:
+        penalty += 10.0
+
+    if rsi_val >= 78.0:
+        penalty += 12.0
+
     raw_total = rsi_score + ma_score + vol_score + bb_score
     raw_score = (raw_total / total_w) * 100.0
     final_score = max(5.0, min(100.0, raw_score - penalty))
@@ -286,39 +296,47 @@ def calculate_analyzed_rise_rate(
     ma_status: str = "보통",
     change_pct: float = 0.0,
     strategy_tag: str = "",
-    bb_pct: float = 0.5
+    bb_pct: float = 0.5,
+    benchmark_regime: str = "상승/반등장 (매수 허용)"
 ) -> float:
     """
-    Computes the quant analyst's modeled expected upside potential / surge rate (분석 상승률, %).
-    Grounded in multi-factor momentum and statistical expectations:
-    - Base expected surge derived from composite quant score: 1.0% + (total_score * 0.05)
-      (e.g., 80점 -> 1.0 + 4.0 = 5.0%, 60점 -> 1.0 + 3.0 = 4.0%, 40점 -> 1.0 + 2.0 = 3.0%)
-    - Volume surge velocity: additional upside for high volume explosion:
-      min(2.5, max(0.0, (vol_ratio - 1.0) * 0.8))
-    - Moving average alignment bonus:
-      +0.8% for 정배열, +0.3% for 수렴/밀집, -0.6% for 역배열
-    - RSI sweet spot bonus (48~68pt: +0.6%), overbought penalty (>75pt: -0.7%)
-    - High-conviction strategy floor:
-      if '당일단타' or '5%타겟' in strategy_tag: floor of 5.0%
-      elif '스나이퍼' in strategy_tag: target +1.5% ~ +4.5%
-      elif '종가배팅' in strategy_tag: target +1.8% ~ +4.8%
-    Result is rounded to 1 decimal place, constrained between +1.0% and +12.0%.
+    Computes a realistic, statistical expected upside potential (분석 기대 상승률, %).
+    Grounded in institutional probability rather than an artificial inflated floor:
+    - Base potential: 1.0% + (total_score * 0.035) -> 80점 -> +3.8%, 70점 -> +3.4%, 60점 -> +3.1%
+    - Volume surge velocity: min(1.8, max(0.0, (vol_ratio - 1.0) * 0.6))
+    - Moving average alignment bonus: +0.6% for 정배열, -0.6% for 역배열
+    - RSI zone bonus/penalty: 48~68pt (+0.4%), >75pt (-0.8% overbought exhaustion)
+    - Upper shadow / bb resistance dampener: if bb_pct > 0.85 -> -0.5%
+    - Realistic strategy calibration without artificial +5.0% floor:
+      - 당일단타 / 5%타겟: min(4.8, max(2.0, est_gain * 0.95))
+      - 스나이퍼 / 눌림목: min(3.5, max(1.5, est_gain * 0.85))
+      - 종가배팅: min(3.5, max(1.5, est_gain * 0.88))
+    - Market regime discount: If down market -> 0.70x haircut
+    Realistic range: +1.2% ~ +4.8% (anchored to actual reachable targets).
     """
-    base_gain = 1.0 + (float(total_score) * 0.05)
-    vol_boost = min(2.5, max(0.0, (float(vol_ratio) - 1.0) * 0.8))
-    ma_boost = 0.8 if "정배열" in ma_status else (0.3 if any(w in ma_status for w in ["수렴", "밀집"]) else (-0.6 if "역배열" in ma_status else 0.0))
-    rsi_boost = 0.6 if 48.0 <= float(rsi_val) <= 68.0 else (-0.7 if float(rsi_val) > 75.0 else 0.0)
+    base_gain = 1.0 + (float(total_score) * 0.035)
+    vol_boost = min(1.8, max(0.0, (float(vol_ratio) - 1.0) * 0.6))
+    ma_boost = 0.6 if "정배열" in ma_status else (0.2 if any(w in ma_status for w in ["수렴", "밀집"]) else (-0.6 if "역배열" in ma_status else 0.0))
+    rsi_boost = 0.4 if 48.0 <= float(rsi_val) <= 68.0 else (-0.8 if float(rsi_val) > 75.0 else 0.0)
+    bb_penalty = -0.5 if float(bb_pct) > 0.85 else 0.0
 
-    est_gain = base_gain + vol_boost + ma_boost + rsi_boost
+    est_gain = base_gain + vol_boost + ma_boost + rsi_boost + bb_penalty
 
+    # Strategy-specific realistic calibration without artificial inflated floor
     if any(k in strategy_tag for k in ["당일단타", "5%타겟", "5% 급등"]):
-        est_gain = max(5.0, est_gain)
-    elif "스나이퍼" in strategy_tag:
-        est_gain = max(1.5, min(4.5, est_gain * 0.7))
+        est_gain = min(6.5, max(1.8, est_gain * 0.95))
+    elif any(k in strategy_tag for k in ["스나이퍼", "눌림"]):
+        est_gain = min(4.0, max(1.2, est_gain * 0.85))
     elif "종가배팅" in strategy_tag:
-        est_gain = max(1.8, min(4.8, est_gain * 0.8))
+        est_gain = min(4.5, max(1.5, est_gain * 0.88))
+    else:
+        est_gain = min(5.0, max(1.0, est_gain * 0.85))
 
-    return round(max(1.0, min(12.0, est_gain)), 1)
+    # Market regime discount if down market
+    if "하락" in str(benchmark_regime) or "조정" in str(benchmark_regime):
+        est_gain *= 0.70
+
+    return round(max(1.0, min(8.0, est_gain)), 1)
 
 
 def evaluate_intraday_outlook(row_today: pd.Series, prev_close: float = 0.0) -> Dict[str, Any]:

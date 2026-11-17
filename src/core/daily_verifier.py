@@ -608,7 +608,7 @@ def run_daily_point_in_time_verification(
                 target_tp = 3.0
                 target_sl = 1.8
                 try:
-                    cb_cand = evaluate_closing_bet_candidate(df_pit, min_today_val_krw=min_val_krw)
+                    cb_cand = evaluate_closing_bet_candidate(df_pit, df_benchmark=bm, min_today_val_krw=min_val_krw)
                     if cb_cand:
                         is_matched = True
                 except Exception:
@@ -620,10 +620,10 @@ def run_daily_point_in_time_verification(
                     target_tp = score_res.get("tp_pct", 4.0)
                     target_sl = score_res.get("sl_pct", 2.0)
 
-            # Fallback to high conviction: score >= 70 and solid liquidity
-            if not is_matched and score >= max(score_cutoff, 70.0) and t1_val >= 5_000_000_000:
+            # Fallback only for general quant mode (do not dilute specific high-winrate strategies)
+            if not is_matched and "일반" in strategy_mode and score >= max(score_cutoff, 70.0) and t1_val >= 5_000_000_000:
                 is_matched = True
-                strat_label = f"{strat_label or '고확신'} ({score:.0f}점)"
+                strat_label = f"일반고확신 ({score:.0f}점)"
                 target_tp = 5.0 if score >= 80 else 3.5
                 target_sl = 2.0
 
@@ -633,8 +633,8 @@ def run_daily_point_in_time_verification(
             if t_open <= 0:
                 continue
 
-            # Exclude extreme gap traps (> +2.8%) and severe gap-downs (< -1.8%)
-            if open_gap_pct > 2.8 or open_gap_pct < -1.8:
+            # Exclude extreme gap traps (> +2.8%) and severe gap-downs (< -0.8%)
+            if open_gap_pct > 2.8 or open_gap_pct < -0.8:
                 continue
 
             # Determine appropriate entry price based on strategy

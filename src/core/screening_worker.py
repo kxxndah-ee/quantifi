@@ -284,7 +284,7 @@ def _evaluate_single_stock(
                     "vol_ratio": vr,
                     "rsi": 68.0,
                     "ma_status": "5·20일선 정배열 대장주",
-                    "rule_note": "08:00~08:50 분석 완료 -> 09:00 적정 갭상승(+1.5%~+4.5%) 시초가 진입 -> 슈팅 시 +4.0% 분할 익절",
+                    "rule_note": "1단계: 08:00~08:50 분석 -> 09:00 시초가 갭(+1.5%~+4.5%) 진입 (음봉 갭하락 시 취소) | 2단계: +2.0% 도달 시 50% 분할 익절 | 3단계: 슈팅 시 +4.0% 익절 / 손절 -2.5%",
                     "reason_summary": reason_summary,
                     "reason_core": reason_core,
                     "reason_criteria": reason_criteria,
@@ -346,7 +346,7 @@ def _evaluate_single_stock(
                     "vol_ratio": vol_r_val,
                     "rsi": rsi_val,
                     "ma_status": m_snp.get("ma_status", "20일선 지지"),
-                    "rule_note": "08:00~08:50 후보 압축 -> 09:00 시초가 갭(-1.5%~+1.5%) 진입 -> 익절 +2.5% / 손절 -2.0%",
+                    "rule_note": "1단계: 08:00~08:50 후보 압축 -> 09:00 시초가 갭(-0.8%~+1.5%) 진입 (-0.8% 이하 갭하락 시 취소) | 2단계: +1.8% 분할 익절 | 3단계: 익절 +2.5% / 손절 -2.0%",
                     "reason_summary": reason_summary,
                     "reason_core": reason_core,
                     "reason_criteria": reason_criteria,
@@ -418,7 +418,7 @@ def _evaluate_single_stock(
                 "vol_ratio": vol_ratio_prev_val,
                 "rsi": 65.0,
                 "ma_status": "장중 수급폭발 돌파",
-                "rule_note": dtrade["rule_note"],
+                "rule_note": f"1단계: 09:00 시초가 갭하락(-0.8% 이하) 시 진입 취소 | 2단계: 현재가({close_p:,.0f}원) 진입 후 +2.0%~+2.5% 도달 시 50% 분할익절 및 본전스탑 상향 | 3단계: 최종목표(+5.0%) / 손절선({round(close_p*0.975):,.0f}원, -2.5%) / 15:15 종가 전량 청산",
                 "reason_summary": reason_summary,
                 "reason_core": reason_core,
                 "reason_criteria": reason_criteria,
@@ -476,7 +476,7 @@ def _evaluate_single_stock(
                 "vol_ratio": vol_r_val,
                 "rsi": rsi_val,
                 "ma_status": m_snp.get("ma_status", "20일선 지지"),
-                "rule_note": "익일 시초가 갭 -1.5%~+1.5% 이내 시에만 체결 (+1.5% 초과 갭상승 시 진입금지)",
+                "rule_note": "1단계: 09:00 시초가 갭 -0.8%~+1.5% 확인 시 진입 (-0.8% 이하 갭하락 시 취소) | 2단계: +1.8% 도달 시 50% 분할 익절 및 본전스탑 상향 | 3단계: 목표 +3.0% / 손절 -2.0% 준수",
                 "reason_summary": reason_summary,
                 "reason_core": reason_core,
                 "reason_criteria": reason_criteria,
@@ -488,7 +488,8 @@ def _evaluate_single_stock(
                 }
             }
         elif "종가배팅" in sc_mode:
-            cbet = evaluate_closing_bet_candidate(df_stock, min_today_val_krw=min_today_val_b * 100_000_000)
+            bm_for_eval = None if ignore_market_filter else bm_ohlcv
+            cbet = evaluate_closing_bet_candidate(df_stock, df_benchmark=bm_for_eval, min_today_val_krw=min_today_val_b * 100_000_000)
             if not cbet or cbet["metrics"]["day_return"] < min_day_ret_val:
                 return None
 
@@ -530,7 +531,7 @@ def _evaluate_single_stock(
                 "vol_ratio": 2.0,
                 "rsi": 65.0,
                 "ma_status": "5·20일선 상단 고가마감",
-                "rule_note": "15:20 종가 진입 -> 익일 09:00 시초가 갭익절(+1.5%↑) 또는 장초반 +1.5% 슈팅 청산",
+                "rule_note": "1단계: 15:20 종가 분할 진입 | 2단계: 익일 09:00 시초가 갭상승(+1.5% 이상) 즉시 50% 분할 익절 | 3단계: 장초반 +3.0% 잔여 익절 / 손절선 -1.8% 준수",
                 "reason_summary": reason_summary,
                 "reason_core": reason_core,
                 "reason_criteria": reason_criteria,
@@ -542,14 +543,17 @@ def _evaluate_single_stock(
                 }
             }
         elif "5% 급등" in sc_mode or "5% 돌파" in sc_mode:
+            bm_for_eval = None if ignore_market_filter else bm_ohlcv
             s5 = evaluate_5pct_surge_candidate(
                 df_stock,
+                df_benchmark=bm_for_eval,
                 min_today_val_krw=min_surge_val_b * 100_000_000,
                 min_day_return_pct=min_day_surge_pct
             )
             if not s5 and is_today_intraday and len(df_stock) >= 31:
                 s5 = evaluate_5pct_surge_candidate(
                     df_stock.iloc[:-1],
+                    df_benchmark=bm_for_eval,
                     min_today_val_krw=min_surge_val_b * 100_000_000,
                     min_day_return_pct=min_day_surge_pct
                 )
@@ -594,7 +598,7 @@ def _evaluate_single_stock(
                 "vol_ratio": m_s5.get("vol_ratio", 3.0),
                 "rsi": 70.0,
                 "ma_status": "신고가/상한가 돌파",
-                "rule_note": "전일 15:20 종가 매수 -> 1~2일 내 장중 +5.0% 돌파 시 즉시 전량 익절 (손절 -4.0%)",
+                "rule_note": "1단계: 전일 15:20 종가 분할 매수 | 2단계: 1~2일 내 장중 +2.5% 도달 시 50% 분할 익절 및 본전스탑 상향 | 3단계: 최종 +5.0% 전량 익절 / 손절선 -4.0% 준수",
                 "reason_summary": reason_summary,
                 "reason_core": reason_core,
                 "reason_criteria": reason_criteria,

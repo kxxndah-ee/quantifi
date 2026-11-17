@@ -23,13 +23,15 @@ LIQUIDITY_THRESHOLD_KRW = 5_000_000_000  # 50억 원 (20일 평균 일거래대�
 def is_trade_feasible(
     prev_close: float,
     next_open: float,
-    prev_prev_close: float = 0.0
+    prev_prev_close: float = 0.0,
+    allow_gap_down_filter: bool = True
 ) -> Tuple[bool, str]:
     """
     Checks whether a buy order can realistically execute on next day open.
     Rejects:
     1. If previous day reached upper limit (+30% price ceiling): cannot buy on open.
     2. If next day open gap > +15% above previous close: gap surge pursuit prohibited.
+    3. If next day open gap < -1.5% below previous close: institutional dumping / breakdown risk.
     """
     if prev_close <= 0 or next_open <= 0:
         return False, "INVALID_PRICE"
@@ -44,6 +46,10 @@ def is_trade_feasible(
     open_gap = (next_open - prev_close) / prev_close
     if open_gap >= 0.15:
         return False, "GAP_UP_EXCEEDS_15PCT"
+
+    # 3. Open gap down < -1.5% check
+    if allow_gap_down_filter and open_gap <= -0.015:
+        return False, "GAP_DOWN_EXCEEDS_1_5PCT"
 
     return True, "FEASIBLE"
 

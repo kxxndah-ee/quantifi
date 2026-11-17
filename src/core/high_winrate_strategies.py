@@ -148,18 +148,27 @@ def evaluate_sniper_candidate(
 
 def evaluate_closing_bet_candidate(
     df: pd.DataFrame,
+    df_benchmark: Optional[pd.DataFrame] = None,
     min_today_val_krw: float = 30_000_000_000  # 당일 거래대금 최소 300억~500억 원
 ) -> Optional[Dict[str, Any]]:
     """
     Evaluates Leader Close-to-Open Overnight Bet (주도주 종가배팅) criteria at 15:20 close:
-    1. Massive Trading Value: today_volume * today_close >= min_today_val_krw
-    2. Strong Bullish Day: day_return >= +3.0%
-    3. Solid Marubozu: Close near High (upper shadow minimal): (Close - Low) / (High - Low) >= 0.85
-    4. Above MAs: Close > MA5 and Close > MA20
-    5. Target: Next morning gap-up / early surge harvest (TP +1.5%, SL -2.0%)
+    1. Market Regime Check: KODEX 200 > 20MA (하락장 차단)
+    2. Massive Trading Value: today_volume * today_close >= min_today_val_krw
+    3. Strong Bullish Day: day_return >= +3.0%
+    4. Solid Marubozu: Close near High (upper shadow minimal): (Close - Low) / (High - Low) >= 0.70
+    5. Above MAs & Not Parabolic Overbought: Close > MA5, Close > MA20, Disparity <= 115%
+    6. Target: Next morning gap-up / early surge harvest (TP +3.0%, SL -1.8%)
     """
     if df is None or len(df) < 5:
         return None
+
+    # Market regime check
+    if df_benchmark is not None:
+        last_date = df.index[-1].strftime("%Y-%m-%d") if hasattr(df.index[-1], "strftime") else str(df.index[-1])[:10]
+        mkt_ok, _, _ = evaluate_market_regime(df_benchmark, as_of_date=last_date)
+        if not mkt_ok:
+            return None
 
     today = df.iloc[-1]
     prev = df.iloc[-2] if len(df) >= 2 else today
@@ -194,6 +203,9 @@ def evaluate_closing_bet_candidate(
         ma5 = float(df["Close"].rolling(5).mean().iloc[-1])
         ma20 = float(df["Close"].rolling(20).mean().iloc[-1])
         if not (close_p > ma5 and close_p > ma20):
+            return None
+        disp = (close_p / ma20) * 100.0 if ma20 > 0 else 100.0
+        if disp > 115.0:
             return None
 
     tp_pct = 3.0
@@ -329,6 +341,13 @@ def evaluate_5pct_surge_candidate(
     if high_close_ratio < 0.70:
         return None
 
+    # 4. Overbought parabolic exhaustion guard (disparity to 20MA <= 118%)
+    if len(df) >= 20:
+        ma20 = float(df["Close"].rolling(20).mean().iloc[-1])
+        disp = (close_p / ma20) * 100.0 if ma20 > 0 else 100.0
+        if disp > 125.0:
+            return None
+
     tp_pct = 5.0
     sl_pct = 4.0
 
@@ -423,15 +442,23 @@ def evaluate_intraday_daytrade_candidate(
 ) -> Optional[Dict[str, Any]]:
     """
     Evaluates '실시간 당일 단타 5% 돌파 모드 (Real-time Day Trading Mode)':
-    1. Intraday Session: evaluated during 09:10 ~ 14:30
-    2. Liquidity Spike: today's trading value >= min_today_val_krw (200억~300억 이상 유입)
-    3. Volume Explosion: today_volume / prev_day_volume >= 0.60 (장중 이미 전일 거래량 60% 이상 돌파)
-    4. Momentum Zone: (Close - Open) / Open * 100 between +3.0% and +9.0% (상승 초입~중간 돌파 구간)
-    5. Solid Body: Close > Open, and (Close - Low) / (High - Low) >= 0.65 (저점 대비 탄탄한 양봉 지지)
-    6. Targets: Take Profit +5.0% from entry, Stop Loss -2.5%, Exit all at 15:15 market close!
+    1. Market Regime: KODEX 200 > 20MA (하락장 시스템적 매수 차단)
+    2. Intraday Session: evaluated during 09:10 ~ 14:30
+    3. Liquidity Spike: today's trading value >= min_today_val_krw (200억~300억 이상 유입)
+    4. Volume Explosion: today_volume / prev_day_volume >= 0.50
+    5. Momentum Zone: (Close - Open) / Open * 100 between +3.0% and +9.0%
+    6. Solid Body: Close > Open, and (Close - Low) / (High - Low) >= 0.50
+    7. Targets: Take Profit +5.0% from entry, Stop Loss -2.5%, Exit all at 15:15 market close!
     """
     if df is None or len(df) < 1:
         return None
+
+    # Market regime check
+    if df_benchmark is not None:
+        last_date = df.index[-1].strftime("%Y-%m-%d") if hasattr(df.index[-1], "strftime") else str(df.index[-1])[:10]
+        mkt_ok, _, _ = evaluate_market_regime(df_benchmark, as_of_date=last_date)
+        if not mkt_ok:
+            return None
 
     today = df.iloc[-1]
     prev = df.iloc[-2] if len(df) >= 2 else today
