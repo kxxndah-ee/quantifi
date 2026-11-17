@@ -904,18 +904,63 @@ def _built_in_quant_reasoning(
 """
 
     # 11. 수급 / 거래량 / 거래대금 / 세력·외인·기관 집중 분석
-    elif any(k in q_lower for k in ["수급", "거래량", "거래대금", "세력", "외인", "외국인", "기관", "매집", "프로그램"]):
-        supply_grade = "메이저 수급 집중 유입 (강력)" if vol_ratio >= 2.0 else ("수급 양호 (점진적 매집)" if vol_ratio >= 1.0 else "거래 소강 (수급 관망)")
-        supply_direct = f"**{name}의 수급 상태는 [{supply_grade}] 판정입니다.** 전일비 {vol_ratio:.2f}배(추정 거래대금 약 {est_val_eok:,.1f}억원)의 수급이 실체 양봉(지지율 {candle_support_pct:.0f}%)으로 뒷받침되어 메이저 자금의 매집 우위가 지속되고 있습니다."
+    elif any(k in q_lower for k in ["수급", "거래량", "거래대금", "세력", "외인", "외국인", "기관", "매집", "프로그램", "순매수", "순매도"]):
+        from src.collectors.investor_data import fetch_investor_trend
+        inv_data = fetch_investor_trend(code)
+
+        if inv_data.get("has_data"):
+            f_latest = inv_data["foreigner_latest_buy"]
+            o_latest = inv_data["organ_latest_buy"]
+            i_latest = inv_data["individual_latest_buy"]
+            h_ratio = inv_data["foreigner_hold_ratio"]
+            f_5d = inv_data["foreigner_5d_sum"]
+            o_5d = inv_data["organ_5d_sum"]
+            consec_f = inv_data["consecutive_foreigner_days"]
+            consec_o = inv_data["consecutive_organ_days"]
+            is_dual_buy = inv_data["is_dual_buying"]
+            is_dual_sell = inv_data["is_dual_selling"]
+
+            if is_dual_buy:
+                supply_grade = "외인·기관 쌍끌이 순매수 유입 (최상위 수급 집중)"
+            elif f_latest > 0 and o_latest <= 0:
+                supply_grade = "외국인 주도 순매수 (메이저 수급 우위)"
+            elif f_latest <= 0 and o_latest > 0:
+                supply_grade = "기관 주도 순매수 (국내 기관 방어)"
+            elif is_dual_sell:
+                supply_grade = "외인·기관 동반 순매도 출회 (수급 차익실현 주의)"
+            else:
+                supply_grade = "외인·기관 수급 관망 (개인 공방)"
+
+            f_streak_txt = f"({abs(consec_f)}일 연속 순매수)" if consec_f >= 2 else (f"({abs(consec_f)}일 연속 순매도)" if consec_f <= -2 else "")
+            o_streak_txt = f"({abs(consec_o)}일 연속 순매수)" if consec_o >= 2 else (f"({abs(consec_o)}일 연속 순매도)" if consec_o <= -2 else "")
+
+            supply_direct = (
+                f"**{name}의 수급 상태는 [{supply_grade}] 판정입니다.** "
+                f"최근 거래일 기준 외국인 {f_latest:+,.0f}주 {f_streak_txt}, 기관 {o_latest:+,.0f}주 {o_streak_txt}의 실제 순매매가 집계되었으며, "
+                f"현재 외국인 지분율은 {h_ratio:.2f}%, 최근 5일간 외인 누적 {f_5d:+,.0f}주 / 기관 누적 {o_5d:+,.0f}주를 기록 중입니다."
+            )
+
+            inv_block = f"""
+- **실제 외국인·기관 순매매 데이터 (네이버 금융·KRX 공시 연동)**:
+  - **외국인 최근일 순매수**: **{f_latest:+,.0f}주** {f_streak_txt} (외국인 보유 지분율: **{h_ratio:.2f}%**)
+  - **기관 최근일 순매수**: **{o_latest:+,.0f}주** {o_streak_txt}
+  - **개인 최근일 순매수**: **{i_latest:+,.0f}주**
+  - **최근 5거래일 누적 순매수**: 외국인 **{f_5d:+,.0f}주** | 기관 **{o_5d:+,.0f}주**
+"""
+        else:
+            supply_grade = "메이저 수급 집중 유입 (강력)" if vol_ratio >= 2.0 else ("수급 양호 (점진적 매집)" if vol_ratio >= 1.0 else "거래 소강 (수급 관망)")
+            supply_direct = f"**{name}의 수급 상태는 [{supply_grade}] 판정입니다.** 전일비 {vol_ratio:.2f}배(추정 거래대금 약 {est_val_eok:,.1f}억원)의 수급이 실체 양봉(지지율 {candle_support_pct:.0f}%)으로 뒷받침되어 메이저 자금의 매집 우위가 지속되고 있습니다."
+            inv_block = ""
+
         ans = f"""> **[수석 애널리스트 핵심 직답]**: {supply_direct}
 
-### **{name} ({code}) 수급 강도 & 거래대금 퀀트 정밀 분석**
+### **{name} ({code}) 수급 강도 & 외인·기관 거래 퀀트 정밀 분석**
 
 - **질문 분석**: `{q_clean}`
 - **퀀트 산출 결과값 (수급 판정)**: **{supply_grade}**
   - **전일 대비 거래량 비율**: **{vol_ratio:.2f}배** (수급 팩터 점수: **{vol_score:.1f}점 / 30점**)
   - **당일 누적 거래량 / 추정 대금**: **{volume:,.0f}주** / **약 {est_val_eok:,.1f}억원**
-  - **장중 양봉 캔들 지지력**: **{candle_support_pct:.0f}%** (윗꼬리 비율 **{upper_shadow_pct:.1f}%**)
+  - **장중 양봉 캔들 지지력**: **{candle_support_pct:.0f}%** (윗꼬리 비율 **{upper_shadow_pct:.1f}%**){inv_block}
 
 **1. 수급 주체 및 에너지 해석**
 - 당일 시가(**{open_p:,.0f}원**) 대비 현재가(**{close:,.0f}원**) 흐름과 **{candle_support_pct:.0f}%**의 캔들 지지율을 볼 때, { '장중 유입된 메이저 매수 자금이 이탈하지 않고 종가까지 강하게 방어되고 있습니다.' if candle_support_pct >= 55 else '장중 차익실현 매물과 저가 매수세가 공방을 벌이는 구간으로 지지선( ' + f'{support_1:,.0f}원) 방어 확인이 중요합니다.' }

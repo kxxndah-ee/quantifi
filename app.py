@@ -5524,6 +5524,31 @@ with tab1:
                 b3.info(f"**거래량 급증비**: {v_val:.2f}배")
                 b4.info(f"**체결 원칙**: {sel_sc.get('rule_note', '-')}")
 
+                try:
+                    from src.collectors.investor_data import fetch_investor_trend
+                    _inv = fetch_investor_trend(sel_sc["code"])
+                    if _inv.get("has_data"):
+                        _f_val = _inv["foreigner_latest_buy"]
+                        _o_val = _inv["organ_latest_buy"]
+                        _h_val = _inv["foreigner_hold_ratio"]
+                        _f_5d = _inv["foreigner_5d_sum"]
+                        _o_5d = _inv["organ_5d_sum"]
+                        _f_color = "#DC2626" if _f_val > 0 else ("#2563EB" if _f_val < 0 else "#64748B")
+                        _o_color = "#DC2626" if _o_val > 0 else ("#2563EB" if _o_val < 0 else "#64748B")
+                        st.markdown(f'''
+<div style="background-color:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 12px; margin:6px 0 10px 0; font-size:0.80rem; line-height:1.5;">
+    <div style="font-weight:700; color:#1E293B; margin-bottom:4px;">외국인 · 기관 실시간 수급 동향 (네이버·KRX 연동)</div>
+    <div style="display:flex; flex-wrap:wrap; gap:14px; color:#475569;">
+        <span>외국인 최근일: <strong style="color:{_f_color};">{_f_val:+,.0f}주</strong></span>
+        <span>기관 최근일: <strong style="color:{_o_color};">{_o_val:+,.0f}주</strong></span>
+        <span>외국인 지분율: <strong>{_h_val:.2f}%</strong></span>
+        <span>5일 누적 외인/기관: <strong>{_f_5d:+,.0f}주 / {_o_5d:+,.0f}주</strong></span>
+    </div>
+</div>
+''', unsafe_allow_html=True)
+                except Exception:
+                    pass
+
                 st.markdown("---")
                 render_quant_analyst_qa_box(sel_sc, key_suffix="insp")
 
