@@ -358,9 +358,10 @@ def _evaluate_single_stock(
                     }
                 }
         elif "당일 단타" in sc_mode:
+            bm_for_eval = None if ignore_market_filter else bm_ohlcv
             dtrade = evaluate_intraday_daytrade_candidate(
                 df_stock,
-                df_benchmark=bm_ohlcv,
+                df_benchmark=bm_for_eval,
                 min_today_val_krw=min_daytrade_val_b * 100_000_000,
                 min_intraday_gain=intraday_gain_range[0],
                 max_intraday_gain=intraday_gain_range[1]

@@ -5016,6 +5016,8 @@ with tab1:
                     help="권장 설정: 최소 0.5배(50%) 이상 | 거래량 폭발 대장주 0.8배 이상",
                     key="sc_min_daytrade_vol_ratio"
                 )
+                cur_ign = st.session_state.get("sc_ignore_market_filter", False)
+                ignore_market_filter = st.checkbox("시장 하락장 무시", value=cur_ign, key="sc_ignore_market_filter")
         elif "스나이퍼" in sc_mode or "장전 시초가" in sc_mode or "08:00~09:00" in sc_mode:
             with sc_c3:
                 snp_options = [50, 100, 150, 200, 300]
@@ -5163,7 +5165,7 @@ with tab1:
                 "min_daytrade_vol_ratio": min_daytrade_vol_ratio if "당일 단타" in sc_mode else 0.5,
                 "min_val_krw_b": min_val_krw_b if ("스나이퍼" in sc_mode or "장전 시초가" in sc_mode or "08:00~09:00" in sc_mode) else 100,
                 "max_disparity_val": max_disparity_val if ("스나이퍼" in sc_mode or "장전 시초가" in sc_mode or "08:00~09:00" in sc_mode) else 103.5,
-                "ignore_market_filter": ignore_market_filter if ("스나이퍼" in sc_mode or "장전 시초가" in sc_mode or "08:00~09:00" in sc_mode) else False,
+                "ignore_market_filter": bool(ignore_market_filter or st.session_state.get("sc_ignore_market_filter", False)),
                 "min_today_val_b": min_today_val_b if "종가배팅" in sc_mode else 200,
                 "min_day_ret_val": min_day_ret_val if "종가배팅" in sc_mode else 3.0,
                 "min_surge_val_b": min_surge_val_b if ("5% 급등" in sc_mode or "5% 돌파" in sc_mode) else 200,
