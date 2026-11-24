@@ -4397,7 +4397,8 @@ with tab1:
         <span style="background-color:#FEE2E2; color:#B91C1C; font-weight:700; font-size:0.75rem; padding:2px 8px; border-radius:4px;">보수적 방어 모드 가동</span>
     </div>
     <div style="font-size:0.78rem; color:#7F1D1D; margin-top:4px; line-height:1.45;">
-        지수가 단기 하락 추세에 있으므로 신규 매수 시 리스크가 증가합니다. <b>원칙 3대 수칙:</b> ① 시초가 갭하락(-0.8% 이하) 종목 당일 진입 취소 ② 1차 익절(+1.8%~+2.5%) 도달 시 50% 분할 익절 및 본전 스탑로스 설정 ③ 원칙 손절선(-2.0%) 철저 준수.
+        지수가 20일선 아래 하락 추세이므로 시스템적 신규 매수가 기본 차단됩니다. (개별 종목 단독 지표로 스크리닝하려면 아래 파라미터 설정 바의 <b>맨 우측 5번째 열 [시장 하락장 무시]</b>를 체크하세요.)<br>
+        <b>원칙 3대 수칙:</b> ① 시초가 갭하락(-0.8% 이하) 종목 당일 진입 취소 ② 1차 익절(+1.8%~+2.5%) 도달 시 50% 분할 익절 ③ 손절선(-2.0%) 철저 준수.
     </div>
 </div>
 ''', unsafe_allow_html=True)
@@ -5040,13 +5041,8 @@ with tab1:
                 cur_cb_ret = st.session_state.get("sc_min_day_ret_val", 3.0)
                 min_day_ret_val = st.slider("당일 최소 주가 상승률 (%)", 2.0, 6.0, value=cur_cb_ret, step=0.5, key="sc_min_day_ret_val")
             with sc_c5:
-                st.markdown(
-                    '<div style="font-size:0.75rem; color:#64748B; padding-top:20px; line-height:1.35; white-space:nowrap; overflow:hidden;">'
-                    '15:20~15:30 종가 매수<br>'
-                    '<span style="color:#7C3AED; font-weight:700;">익일 시초 +1.5% 갭 익절</span>'
-                    '</div>',
-                    unsafe_allow_html=True
-                )
+                cur_ign = st.session_state.get("sc_ignore_market_filter", False)
+                ignore_market_filter = st.checkbox("시장 하락장 무시", value=cur_ign, key="sc_ignore_market_filter")
         elif "5% 급등" in sc_mode or "5% 돌파" in sc_mode:
             with sc_c3:
                 surge_options = [100, 200, 300, 500]
@@ -5057,13 +5053,8 @@ with tab1:
                 cur_s_pct = st.session_state.get("sc_min_day_surge_pct", 8.0)
                 min_day_surge_pct = st.slider("당일 최소 주가 상승률 (%)", 5.0, 25.0, value=cur_s_pct, step=1.0, key="sc_min_day_surge_pct")
             with sc_c5:
-                st.markdown(
-                    '<div style="font-size:0.75rem; color:#64748B; padding-top:20px; line-height:1.35; white-space:nowrap; overflow:hidden;">'
-                    '장중 급등·마감 직전 진입<br>'
-                    '<span style="color:#D97706; font-weight:700;">익절 +5.0% / 손절 -4.0%</span>'
-                    '</div>',
-                    unsafe_allow_html=True
-                )
+                cur_ign = st.session_state.get("sc_ignore_market_filter", False)
+                ignore_market_filter = st.checkbox("시장 하락장 무시", value=cur_ign, key="sc_ignore_market_filter")
         else:
             with sc_c3:
                 cur_score = st.session_state.get("sc_min_screener_score", 65.0)
