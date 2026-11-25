@@ -4730,7 +4730,11 @@ with tab1:
 <div style="font-size:0.78rem; line-height:1.45; color:#334155; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:10px 12px;">
 <div style="font-size:0.84rem; font-weight:700; color:#1E293B; margin-bottom:6px;">[장전 시초가 공략 모드] 핵심 원칙 (프리마켓 데이터 연동 + 눌림 반등 + 주도 갭상승)</div>
 • <strong>분석 시점</strong>: 매일 아침 08:00 ~ 08:50 (정규장 개장 전 전일 확정 데이터 + 글로벌 프리마켓 지표 기반 종합 분석)<br>
-• <strong>프리마켓 데이터 연동 분석</strong>: 미국 나스닥/S&P/SOXX 야간선물, 달러 환율, VIX 변동성을 연동하여 시초 갭상승 신뢰도를 검증하고 갭상승 음봉 트랩을 사전 차단합니다.<br>
+• <strong>프리마켓 데이터 연동 분석</strong>: 미국 나스닥/S&P/SOXX, 달러 환율, VIX 변동성을 연동하여 시초 갭상승 신뢰도를 검증하고 갭상승 음봉 트랩을 사전 차단합니다.<br>
+• <strong>정밀 미장 섹터 핀포인트 & 갭트랩 필터</strong>:<br>
+  - <strong>반도체/소부장</strong>: 필라델피아 반도체(SOXX) 랠리 시 최대 +4.0점 부스트 / 급락 시 -5.0점 감점<br>
+  - <strong>성장/AI/바이오</strong>: 나스닥 지수 연동 최대 +3.0점 부스트 / 급락 시 -4.0점 감점<br>
+  - <strong>미장 역행 갭트랩 차단</strong>: 미장 급락에도 동시호가에 비정상적으로 뜬 갭상승(+3.5%↑) 종목을 자동 필터링하여 시초가 윗꼬리 물림 방지<br>
 • <strong>트랙 1 (20일선 눌림목 반등)</strong>: 20일 일평균 거래대금 100억↑ & 20일선 이격도 98%~103.5% 첫 지지 반등 우량주 (시초 갭 -1.5%~+1.5% 진입, 익절 +2.5% / 손절 -2.0%)<br>
 • <strong>트랙 2 (주도 대장주 갭상승)</strong>: 전일 거래대금 800억~1,000억↑ 폭발 & 고가 마감 최상위 1등주 (동시호가 +1.5%~+4.5% 적정 갭 확인 후 시초가 진입, 익절 +4.0% / 손절 -2.5%)<br>
 • <strong>장전 동시호가(08:30~09:00) 원칙</strong>: 08:50 이전 호가는 허매수/허매도 왜곡이 심하므로, 08:50~09:00 형성되는 실체결 예상 갭(+1.5%~+4.5%)을 최종 확인하고 진입 (+5.0% 초과 과열 시 뇌동매매 금지)
@@ -5318,6 +5322,8 @@ with tab1:
                 "low_pct",
                 "score",
                 "label",
+                "premarket_sector_tag",
+                "gap_anomaly_tag",
                 "reason_summary",
                 "vol_ratio",
                 "rsi",
@@ -5338,6 +5344,8 @@ with tab1:
                     "low_pct": st.column_config.NumberColumn("저가(%)", help="전일 종가 대비 당일 최저가 등락률", format="%+.2f%%"),
                     "score": st.column_config.ProgressColumn("익일스코어", min_value=0, max_value=100, format="%.1f점"),
                     "label": st.column_config.TextColumn("전망"),
+                    "premarket_sector_tag": st.column_config.TextColumn("미장 섹터 연동", width="medium"),
+                    "gap_anomaly_tag": st.column_config.TextColumn("시초 갭 검증", width="medium"),
                     "reason_summary": st.column_config.TextColumn("선정 핵심 근거", width="large"),
                     "vol_ratio": st.column_config.NumberColumn("거래량비", format="%.1f배"),
                     "rsi": st.column_config.NumberColumn("RSI", format="%.1f"),
@@ -5449,7 +5457,13 @@ with tab1:
                 target_sl_val = sel_sc["close"] * (1.0 - sel_sc["sl_pct"] / 100.0)
 
                 pm_reg = sel_sc.get("premarket_regime", "")
+                sec_tag = sel_sc.get("premarket_sector_tag", "")
+                anom_tag = sel_sc.get("gap_anomaly_tag", "")
                 pm_guide_line = f"• **글로벌 프리마켓 지표**: 체제 **[{pm_reg}]** (리스크: {sel_sc.get('premarket_risk', '보통')}) | {sel_sc.get('premarket_gap_guide', '적정 갭 확인 후 시초가 주문')}\n\n" if pm_reg else ""
+                if sec_tag:
+                    pm_guide_line += f"• **미장 선행 섹터 연동**: **{sec_tag}**\n\n"
+                if anom_tag:
+                    pm_guide_line += f"• **시초가 갭 검증 결과**: **{anom_tag}**\n\n"
 
                 if "08:00" in timing_val or "장전" in timing_val:
                     st.success(

@@ -243,7 +243,17 @@ def _evaluate_single_stock(
                 pm_gap_guide = pm_ctx.get("gap_guide", "적정 갭 +1.5%~+4.5% 확인 후 진입")
                 pm_risk = pm_ctx.get("gap_risk", "보통 (중립)")
                 pm_mod = pm_ctx.get("score_mod", 0.0)
-                lead_score = min(99.0, max(60.0, min(98.0, 78.0 + min(12.0, val_b / 250.0) + min(8.0, ret_p / 2.0)) + pm_mod))
+
+                from src.collectors.us_market import get_sector_macro_boost, detect_premarket_gap_anomaly
+                sec_boost_info = get_sector_macro_boost(sector, pm_ctx)
+                gap_anomaly_info = detect_premarket_gap_anomaly(sector, open_pct, pm_ctx)
+
+                if gap_anomaly_info.get("is_gap_trap") and not ignore_market_filter:
+                    return None
+
+                sec_mod = sec_boost_info.get("boost", 0.0)
+                anom_mod = gap_anomaly_info.get("score_adjustment", 0.0)
+                lead_score = min(99.0, max(60.0, min(98.0, 78.0 + min(12.0, val_b / 250.0) + min(8.0, ret_p / 2.0)) + pm_mod + sec_mod + anom_mod))
 
                 reason_summary = f"[주도 갭상승] 전일대금 {val_b:,.0f}억 폭발 | 종가 +{ret_p:.1f}% 고가마감 | 거래량 {vr:.1f}배"
                 reason_core = "전일 대규모 주도 거래대금을 분출하며 일봉 최고가권으로 마감한 시장 1등 대장주입니다. 장전 08:00~08:50 동시호가 예상체결가 점검 후 09:00 시초가 적정 갭상승(+1.5%~+4.5%) 출발 시 장초반 강력한 2차 슈팅 파동을 타겟합니다."
@@ -254,6 +264,8 @@ def _evaluate_single_stock(
                     "이평선 정배열 (종가 > 5일선 > 20일선 단기 정배열 유지)",
                     "장전 시초가 체결 원칙: 예상 갭 +1.5% ~ +4.5% 적정 갭 확인 후 진입 (+5% 초과 과열 시 진입 금지)",
                     f"글로벌 프리마켓 분석: 미증시/매크로 [{pm_regime}] (나스닥 {pm_ctx.get('nasdaq_pct', 0.0):+.2f}%, SOXX {pm_ctx.get('soxx_pct', 0.0):+.2f}%) - {pm_gap_guide}",
+                    f"미장 섹터 핀포인트: {sec_boost_info['tag']} ({sec_boost_info['guide']})",
+                    f"시초가 갭 검증: {gap_anomaly_info['anomaly_tag']} ({gap_anomaly_info['anomaly_guide']})",
                     "목표 익절 +4.0% / 원칙 손절 -2.5% 자동 스탑로스"
                 ]
 
@@ -278,6 +290,9 @@ def _evaluate_single_stock(
                     "premarket_gap_guide": pm_gap_guide,
                     "premarket_risk": pm_risk,
                     "score": lead_score,
+                    "premarket_sector_boost": sec_mod,
+                    "premarket_sector_tag": sec_boost_info.get("tag", ""),
+                    "gap_anomaly_tag": gap_anomaly_info.get("anomaly_tag", ""),
                     "label": "강력 주도주" if lead_score >= 88 else "우량 주도주",
                     "tp_pct": 4.0,
                     "sl_pct": 2.5,
@@ -309,6 +324,17 @@ def _evaluate_single_stock(
                 pm_gap_guide = pm_ctx.get("gap_guide", "보합권 -1.5%~+1.5% 진입")
                 pm_risk = pm_ctx.get("gap_risk", "보통 (중립)")
 
+                from src.collectors.us_market import get_sector_macro_boost, detect_premarket_gap_anomaly
+                sec_boost_info = get_sector_macro_boost(sector, pm_ctx)
+                gap_anomaly_info = detect_premarket_gap_anomaly(sector, open_pct, pm_ctx)
+
+                if gap_anomaly_info.get("is_gap_trap") and not ignore_market_filter:
+                    return None
+
+                sec_mod = sec_boost_info.get("boost", 0.0)
+                anom_mod = gap_anomaly_info.get("score_adjustment", 0.0)
+                snp_score = min(99.0, max(60.0, snp["score"] + sec_mod + anom_mod))
+
                 reason_criteria = [
                     "KODEX 200 지수 추세 필터 통과 (시스템적 하락장 차단)" if not ignore_market_filter else "개별 종목 기술적 지표 단독 검증",
                     f"20일 일평균 거래대금 {avg_val_b:,.0f}억 원 (기준 {min_val_krw_b}억 원 이상 충족)",
@@ -316,6 +342,8 @@ def _evaluate_single_stock(
                     f"RSI(14) {rsi_val:.1f} (에너지 응축 건전한 반등 구간)",
                     "장전 시초가 체결 원칙: 시초가 갭 -1.5% ~ +1.5% 적정 보합권 진입 (+1.5% 초과 갭상승 시 진입 금지)",
                     f"글로벌 프리마켓 점검: 미증시/매크로 [{pm_regime}] 상태 연동 - 20일선 눌림목 첫 반등 지지력 확인",
+                    f"미장 섹터 핀포인트: {sec_boost_info['tag']} ({sec_boost_info['guide']})",
+                    f"시초가 갭 검증: {gap_anomaly_info['anomaly_tag']} ({gap_anomaly_info['anomaly_guide']})",
                     "목표 익절 +2.5% / 원칙 손절 -2.0% 자동 스탑로스"
                 ]
 
@@ -339,7 +367,10 @@ def _evaluate_single_stock(
                     "premarket_regime": pm_regime,
                     "premarket_gap_guide": pm_gap_guide,
                     "premarket_risk": pm_risk,
-                    "score": snp["score"],
+                    "score": snp_score,
+                    "premarket_sector_boost": sec_mod,
+                    "premarket_sector_tag": sec_boost_info.get("tag", ""),
+                    "gap_anomaly_tag": gap_anomaly_info.get("anomaly_tag", ""),
                     "label": snp["label"],
                     "tp_pct": 2.5,
                     "sl_pct": 2.0,

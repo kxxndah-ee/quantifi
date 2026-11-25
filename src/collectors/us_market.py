@@ -315,3 +315,200 @@ def get_premarket_analysis_context(us_summary: Optional[Dict[str, Any]] = None) 
         "action_guide": us_summary.get("action_guide", "")
     }
 
+
+def get_sector_macro_boost(sector_name: str, premarket_ctx: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """
+    Computes pinpoint score boost/penalty and directional macro guideline for a domestic sector
+    based on US leading indicators (SOXX, NASDAQ, USD/KRW, VIX).
+    Returns:
+        - boost: float
+        - tag: str
+        - status: "STRONG_BOOST", "BOOST", "NEUTRAL", "CAUTION", "PENALTY"
+        - guide: str
+    """
+    if premarket_ctx is None:
+        premarket_ctx = get_premarket_analysis_context()
+
+    soxx_pct = float(premarket_ctx.get("soxx_pct", 0.0))
+    nasdaq_pct = float(premarket_ctx.get("nasdaq_pct", 0.0))
+    usdkrw_rate = float(premarket_ctx.get("usdkrw_rate", 1340.0))
+    vix_val = float(premarket_ctx.get("vix_val", 16.0))
+
+    sec = str(sector_name or "").lower()
+
+    # 1. Semiconductor & Hardware: linked to SOXX
+    if any(k in sec for k in ["반도체", "소부장", "it부품", "전자부품", "하드웨어"]):
+        if soxx_pct >= 2.0:
+            return {
+                "boost": 4.0,
+                "tag": f"SOXX 랠리 훈풍 (+4.0점)",
+                "status": "STRONG_BOOST",
+                "guide": f"필라델피아 반도체 지수({soxx_pct:+.2f}%) 폭등으로 국내 반도체 대장주 시초가 적정 갭상승 및 장초반 2차 슈팅 탄력 최우수"
+            }
+        elif soxx_pct >= 0.7:
+            return {
+                "boost": 2.0,
+                "tag": f"SOXX 반도체 양호 (+2.0점)",
+                "status": "BOOST",
+                "guide": f"필라델피아 반도체 지수({soxx_pct:+.2f}%) 상승세로 반도체 소부장 시초 갭상승 우호"
+            }
+        elif soxx_pct <= -2.5:
+            return {
+                "boost": -5.0,
+                "tag": f"SOXX 반도체 급락 경계 (-5.0점)",
+                "status": "PENALTY",
+                "guide": f"필라델피아 반도체 지수({soxx_pct:+.2f}%) 급락으로 국내 반도체 섹터 동반 갭하락 및 외인 매도세 주의"
+            }
+        elif soxx_pct <= -1.0:
+            return {
+                "boost": -2.5,
+                "tag": f"SOXX 반도체 조정 (-2.5점)",
+                "status": "CAUTION",
+                "guide": f"필라델피아 반도체 지수({soxx_pct:+.2f}%) 약세로 시초가 보수적 분할 대응 필요"
+            }
+        else:
+            return {
+                "boost": 0.0,
+                "tag": "SOXX 반도체 중립",
+                "status": "NEUTRAL",
+                "guide": "필라델피아 반도체 보합권 유지로 개별 수급 위주 등락"
+            }
+
+    # 2. Software, Platform, AI, Tech, Bio: linked to NASDAQ
+    elif any(k in sec for k in ["소프트웨어", "it서비스", "인터넷", "게임", "미디어", "인공지능", "ai", "바이오", "제약", "생명공학", "헬스케어"]):
+        if nasdaq_pct >= 1.5:
+            return {
+                "boost": 3.0,
+                "tag": f"나스닥 기술주 랠리 (+3.0점)",
+                "status": "BOOST",
+                "guide": f"미 나스닥({nasdaq_pct:+.2f}%) 강세로 국내 성장주/IT/바이오 투자심리 개선 및 시초 갭 안착 우호"
+            }
+        elif nasdaq_pct <= -1.7:
+            return {
+                "boost": -4.0,
+                "tag": f"나스닥 기술주 급락 경계 (-4.0점)",
+                "status": "PENALTY",
+                "guide": f"미 나스닥({nasdaq_pct:+.2f}%) 급락으로 국내 성장주 밸류에이션 부담 및 차익 매물 주의"
+            }
+        elif nasdaq_pct <= -0.8:
+            return {
+                "boost": -1.5,
+                "tag": f"나스닥 기술주 약세 (-1.5점)",
+                "status": "CAUTION",
+                "guide": f"미 나스닥({nasdaq_pct:+.2f}%) 약세로 기술주 시초가 추격 자제"
+            }
+        else:
+            return {
+                "boost": 0.0,
+                "tag": "나스닥 기술주 중립",
+                "status": "NEUTRAL",
+                "guide": "나스닥 보합권으로 개별 재료 및 당일 수급 중심 대응"
+            }
+
+    # 3. Finance, Large Cap, Holdings: linked to FX (USD/KRW)
+    elif any(k in sec for k in ["금융", "지주", "은행", "증권", "보험"]):
+        if usdkrw_rate >= 1420.0 or vix_val >= 22.0:
+            return {
+                "boost": -3.0,
+                "tag": f"환율/VIX 외인 이탈 주의 (-3.0점)",
+                "status": "CAUTION",
+                "guide": f"환율({usdkrw_rate:,.1f}원) 상승 및 VIX({vix_val:.1f}) 급등으로 대형 금융주 외인 패시브 매도 압력 주의"
+            }
+        elif usdkrw_rate <= 1350.0 and vix_val <= 16.0:
+            return {
+                "boost": 2.0,
+                "tag": f"환율 안정 외인 우호 (+2.0점)",
+                "status": "BOOST",
+                "guide": f"환율({usdkrw_rate:,.1f}원) 및 VIX 안정세로 대형 금융주 외인 순매수 유입 우호"
+            }
+        else:
+            return {
+                "boost": 0.0,
+                "tag": "금융 매크로 중립",
+                "status": "NEUTRAL",
+                "guide": "환율 및 거시경제 지표 보합권"
+            }
+
+    # 4. Default / General Sectors
+    return {
+        "boost": 0.0,
+        "tag": "섹터 매크로 중립",
+        "status": "NEUTRAL",
+        "guide": "글로벌 매크로 지수 영향 제한적, 개별 종목 수급 및 차트 집중"
+    }
+
+
+def detect_premarket_gap_anomaly(
+    stock_sector: str,
+    open_pct: float,
+    premarket_ctx: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Evaluates whether the domestic stock's open gap (+% from previous close) aligns with or contradicts
+    overnight US leading market conditions, catching Gap Traps (fake spikes) and Golden Alignments.
+    Returns:
+        - is_gap_trap: bool
+        - is_momentum_aligned: bool
+        - anomaly_tag: str
+        - anomaly_guide: str
+        - score_adjustment: float
+    """
+    if premarket_ctx is None:
+        premarket_ctx = get_premarket_analysis_context()
+
+    regime = premarket_ctx.get("regime", "중립")
+    soxx_pct = float(premarket_ctx.get("soxx_pct", 0.0))
+    nasdaq_pct = float(premarket_ctx.get("nasdaq_pct", 0.0))
+
+    sec = str(stock_sector or "").lower()
+    is_semi = any(k in sec for k in ["반도체", "소부장", "it부품", "전자부품"])
+    is_tech = any(k in sec for k in ["소프트웨어", "it서비스", "인터넷", "게임", "바이오"])
+
+    # 1. Bear Gap Trap: US plunged, but domestic stock gaps up abnormally high -> High risk of opening dump!
+    if (regime in ("위험", "경계")) or (is_semi and soxx_pct <= -2.0) or (is_tech and nasdaq_pct <= -1.8):
+        if open_pct >= 3.5:
+            return {
+                "is_gap_trap": True,
+                "is_momentum_aligned": False,
+                "anomaly_tag": "[미장 역행 갭트랩 경고]",
+                "anomaly_guide": f"간밤 미장/SOXX 급락({soxx_pct:+.1f}%)에도 불구하고 시초가가 +{open_pct:.1f}% 이상 무리하게 높게 형성되었습니다. 개장 직후 외인/기관의 시초가 차익실현 및 윗꼬리 장대음봉 전환 위험이 극히 높으므로 시초가 진입을 전면 배제합니다.",
+                "score_adjustment": -8.0
+            }
+
+    # 2. Golden Momentum Alignment: US surged and domestic stock opens with solid appropriate gap
+    if (regime == "우호") or (is_semi and soxx_pct >= 1.5) or (is_tech and nasdaq_pct >= 1.2):
+        if 1.5 <= open_pct <= 4.5:
+            return {
+                "is_gap_trap": False,
+                "is_momentum_aligned": True,
+                "anomaly_tag": "[글로벌 모멘텀 일치]",
+                "anomaly_guide": f"미장 주도 섹터 호조와 시초가 적정 갭상승(+{open_pct:.1f}%)이 완벽히 일치합니다. 09:00 시초가 체결 후 장초반 강력한 2차 슈팅 및 익절 확률이 극대화된 주도주 구간입니다.",
+                "score_adjustment": 3.0
+            }
+        elif open_pct > 5.0:
+            return {
+                "is_gap_trap": False,
+                "is_momentum_aligned": False,
+                "anomaly_tag": "[시초가 과열 주의]",
+                "anomaly_guide": f"글로벌 훈풍은 우수하나 시초가 갭(+{open_pct:.1f}%)이 +5%를 초과하여 장초반 단기 과열권입니다. 시초가 추격매수 대신 눌림목 재확인이 필수적입니다.",
+                "score_adjustment": -2.0
+            }
+
+    # 3. Healthy Pullback Rebound Open
+    if -1.5 <= open_pct <= 1.0:
+        return {
+            "is_gap_trap": False,
+            "is_momentum_aligned": False,
+            "anomaly_tag": "[보합권 건전 시초가]",
+            "anomaly_guide": f"시초가({open_pct:+.1f}%)가 보합권에서 차분하게 출발하여 20일선 눌림목 첫 지지 반등을 노리기에 안정적인 손익비를 제공합니다.",
+            "score_adjustment": 1.0
+        }
+
+    return {
+        "is_gap_trap": False,
+        "is_momentum_aligned": False,
+        "anomaly_tag": "시초가 중립 체결",
+        "anomaly_guide": f"시초가 갭 {open_pct:+.1f}%로 일반적인 수급 범위 내 출발입니다.",
+        "score_adjustment": 0.0
+    }
+

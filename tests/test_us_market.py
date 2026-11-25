@@ -3,7 +3,9 @@ from unittest.mock import patch
 from src.collectors.us_market import (
     fetch_us_market_summary,
     determine_global_market_regime,
-    get_sector_macro_note
+    get_sector_macro_note,
+    get_sector_macro_boost,
+    detect_premarket_gap_anomaly
 )
 from src.core.quant_analyst import generate_quant_expert_answer
 
@@ -150,6 +152,42 @@ class TestUSMarketQuant(unittest.TestCase):
         ans = generate_quant_expert_answer(stock_a, "HLB와 삼성전자 중 상승 가능성이 더 높은 종목은?", compare_stocks=[stock_a, stock_b])
         self.assertIn("글로벌 미장 연동 점검", ans)
         self.assertIn("나스닥", ans)
+
+
+
+    def test_get_sector_macro_boost_semi_bull(self):
+        ctx = {"soxx_pct": 2.5, "nasdaq_pct": 1.0, "usdkrw_rate": 1340.0, "vix_val": 15.0}
+        res = get_sector_macro_boost("반도체/전자부품", ctx)
+        self.assertEqual(res["boost"], 4.0)
+        self.assertEqual(res["status"], "STRONG_BOOST")
+        self.assertIn("SOXX", res["tag"])
+
+    def test_get_sector_macro_boost_semi_bear(self):
+        ctx = {"soxx_pct": -3.0, "nasdaq_pct": -1.5, "usdkrw_rate": 1390.0, "vix_val": 22.0}
+        res = get_sector_macro_boost("반도체 소부장", ctx)
+        self.assertEqual(res["boost"], -5.0)
+        self.assertEqual(res["status"], "PENALTY")
+
+    def test_get_sector_macro_boost_tech(self):
+        ctx_bull = {"soxx_pct": 0.5, "nasdaq_pct": 2.0, "usdkrw_rate": 1340.0, "vix_val": 15.0}
+        res = get_sector_macro_boost("소프트웨어/AI", ctx_bull)
+        self.assertEqual(res["boost"], 3.0)
+        self.assertEqual(res["status"], "BOOST")
+
+    def test_detect_premarket_gap_anomaly_trap(self):
+        ctx_bear = {"regime": "위험", "soxx_pct": -3.0, "nasdaq_pct": -2.0}
+        res = detect_premarket_gap_anomaly("반도체", 4.0, ctx_bear)
+        self.assertTrue(res["is_gap_trap"])
+        self.assertEqual(res["score_adjustment"], -8.0)
+        self.assertIn("갭트랩", res["anomaly_tag"])
+
+    def test_detect_premarket_gap_anomaly_aligned(self):
+        ctx_bull = {"regime": "우호", "soxx_pct": 2.0, "nasdaq_pct": 1.5}
+        res = detect_premarket_gap_anomaly("반도체", 2.5, ctx_bull)
+        self.assertFalse(res["is_gap_trap"])
+        self.assertTrue(res["is_momentum_aligned"])
+        self.assertEqual(res["score_adjustment"], 3.0)
+        self.assertIn("모멘텀", res["anomaly_tag"])
 
 
 if __name__ == "__main__":
