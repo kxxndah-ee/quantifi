@@ -164,7 +164,7 @@ _LAST_COMPLETED_CHECK_TIME: float = 0.0
 def get_last_completed_trading_day() -> str:
     """
     Returns the most recent completed market trading date string (YYYY-MM-DD) before today.
-    Uses cached KODEX 200 benchmark dates to accurately account for market holidays and weekends.
+    Uses calendar calculation and benchmark cache to accurately account for market holidays and weekends.
     """
     global _LAST_COMPLETED_TRADING_DAY, _LAST_COMPLETED_CHECK_TIME
     import time
@@ -172,28 +172,37 @@ def get_last_completed_trading_day() -> str:
     now_kst = get_now_kst()
     today_str = now_kst.strftime("%Y-%m-%d")
 
-    if _LAST_COMPLETED_TRADING_DAY and (now - _LAST_COMPLETED_CHECK_TIME < 300):
+    if _LAST_COMPLETED_TRADING_DAY and (now - _LAST_COMPLETED_CHECK_TIME < 60):
         return _LAST_COMPLETED_TRADING_DAY
 
+    # Expected completed trading day from calendar
+    if now_kst.weekday() < 5 and now_kst.hour >= 16:
+        expected_day = today_str
+    else:
+        dt = now_kst - timedelta(days=1)
+        while dt.weekday() >= 5:
+            dt -= timedelta(days=1)
+        expected_day = dt.strftime("%Y-%m-%d")
+
+    # If benchmark cache has equal or newer completed date, check it for holiday handling
     try:
         cache_path = get_cache_path(BENCHMARK_CODE)
         if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
             bm = pd.read_parquet(cache_path)
             if not bm.empty:
                 bm.index = pd.to_datetime(bm.index)
-                bm_past = bm[bm.index.strftime("%Y-%m-%d") < today_str]
+                bm_past = bm[bm.index.strftime("%Y-%m-%d") <= expected_day]
                 if not bm_past.empty:
-                    _LAST_COMPLETED_TRADING_DAY = bm_past.index.max().strftime("%Y-%m-%d")
-                    _LAST_COMPLETED_CHECK_TIME = now
-                    return _LAST_COMPLETED_TRADING_DAY
+                    bm_max_date = bm_past.index.max().strftime("%Y-%m-%d")
+                    # If benchmark date is at or after expected day, trust benchmark
+                    if bm_max_date >= expected_day:
+                        _LAST_COMPLETED_TRADING_DAY = bm_max_date
+                        _LAST_COMPLETED_CHECK_TIME = now
+                        return _LAST_COMPLETED_TRADING_DAY
     except Exception:
         pass
 
-    # Fallback to weekday subtraction
-    dt = now_kst - timedelta(days=1)
-    while dt.weekday() >= 5:
-        dt -= timedelta(days=1)
-    _LAST_COMPLETED_TRADING_DAY = dt.strftime("%Y-%m-%d")
+    _LAST_COMPLETED_TRADING_DAY = expected_day
     _LAST_COMPLETED_CHECK_TIME = now
     return _LAST_COMPLETED_TRADING_DAY
 
@@ -232,9 +241,9 @@ def fetch_ohlcv(
 
                 last_cached_date = df_cached.index.max().strftime("%Y-%m-%d") if not df_cached.empty else "1900-01-01"
 
-                # If target is historical (prior to today) and cache covers it or last completed trading day
+                # If target is historical (prior to today) and cache covers it
                 if not is_target_today:
-                    if last_cached_date >= target_end or last_cached_date >= last_trading_day:
+                    if last_cached_date >= target_end:
                         return df_cached.loc[start:target_end]
                 else:
                     # Target is today: if outside market session and cache covers target_end

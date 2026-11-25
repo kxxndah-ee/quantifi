@@ -163,13 +163,6 @@ def evaluate_closing_bet_candidate(
     if df is None or len(df) < 5:
         return None
 
-    # Market regime check
-    if df_benchmark is not None:
-        last_date = df.index[-1].strftime("%Y-%m-%d") if hasattr(df.index[-1], "strftime") else str(df.index[-1])[:10]
-        mkt_ok, _, _ = evaluate_market_regime(df_benchmark, as_of_date=last_date)
-        if not mkt_ok:
-            return None
-
     today = df.iloc[-1]
     prev = df.iloc[-2] if len(df) >= 2 else today
 
@@ -198,6 +191,15 @@ def evaluate_closing_bet_candidate(
     if high_close_ratio < 0.70:
         return None
 
+    # Market regime check with alpha leader exception for massive volume breakouts / limit-up stocks
+    if df_benchmark is not None:
+        last_date = df.index[-1].strftime("%Y-%m-%d") if hasattr(df.index[-1], "strftime") else str(df.index[-1])[:10]
+        mkt_ok, _, _ = evaluate_market_regime(df_benchmark, as_of_date=last_date)
+        if not mkt_ok:
+            is_alpha_leader = (today_val >= 30_000_000_000 and day_return >= 8.0 and high_close_ratio >= 0.70)
+            if not is_alpha_leader:
+                return None
+
     # 4. Above short-term moving average (if enough history available)
     if len(df) >= 20:
         ma5 = float(df["Close"].rolling(5).mean().iloc[-1])
@@ -205,17 +207,27 @@ def evaluate_closing_bet_candidate(
         if not (close_p > ma5 and close_p > ma20):
             return None
         disp = (close_p / ma20) * 100.0 if ma20 > 0 else 100.0
-        if disp > 115.0:
+        # Relax disparity cap for massive trading value leaders and limit-up breakouts (up to 135%)
+        max_allowed_disp = 135.0 if (today_val >= 30_000_000_000 and day_return >= 8.0) else 118.0
+        if disp > max_allowed_disp:
             return None
 
-    tp_pct = 3.0
+    is_limit_up = (day_return >= 28.5 or close_p >= prev_close * 1.295)
+    is_super_breakout = (day_return >= 15.0 or today_val >= 80_000_000_000)
+
+    score_val = 98.0 if is_limit_up else (97.0 if is_super_breakout else 95.0)
+    label_val = "초강세(상한가종배)" if is_limit_up else ("초강세(주도종배)" if is_super_breakout else "강세(종가배팅)")
+    tag_val = "주도주 상한가 종가배팅 (익일 갭수익 공략)" if is_limit_up else "주도주 종가배팅 (익일 갭수익 공략)"
+    candle_desc = "상한가 잔량 유지 초대형 거래대금 고가마감" if is_limit_up else ("초대형 주도 거래대금 장대양봉 고가마감" if is_super_breakout else "거래대금 폭발 장대양봉 고가마감")
+
+    tp_pct = 3.5 if is_limit_up else 3.0
     sl_pct = 1.8
 
     return {
         "strategy": "CLOSING_BET",
-        "name_tag": "주도주 종가배팅 (익일 갭수익 공략)",
-        "score": 95.0,
-        "label": "강세(종가배팅)",
+        "name_tag": tag_val,
+        "score": score_val,
+        "label": label_val,
         "tp_pct": tp_pct,
         "sl_pct": sl_pct,
         "entry_time": "15:20 종가",
@@ -225,7 +237,7 @@ def evaluate_closing_bet_candidate(
             "day_return": round(day_return, 2),
             "today_trading_val_억": round(today_val / 1e8, 1),
             "high_close_ratio": round(high_close_ratio * 100, 1),
-            "candle_type": "거래대금 폭발 장대양봉 고가마감",
+            "candle_type": candle_desc,
         }
     }
 
@@ -306,13 +318,6 @@ def evaluate_5pct_surge_candidate(
     if df is None or len(df) < 5:
         return None
 
-    # Market regime check
-    if df_benchmark is not None:
-        last_date = df.index[-1].strftime("%Y-%m-%d")
-        mkt_ok, _, _ = evaluate_market_regime(df_benchmark, as_of_date=last_date)
-        if not mkt_ok:
-            return None
-
     today = df.iloc[-1]
     prev = df.iloc[-2] if len(df) >= 2 else today
 
@@ -341,12 +346,29 @@ def evaluate_5pct_surge_candidate(
     if high_close_ratio < 0.70:
         return None
 
-    # 4. Overbought parabolic exhaustion guard (disparity to 20MA <= 118%)
+    # Market regime check with alpha leader exception for massive volume breakouts / limit-up stocks
+    if df_benchmark is not None:
+        last_date = df.index[-1].strftime("%Y-%m-%d")
+        mkt_ok, _, _ = evaluate_market_regime(df_benchmark, as_of_date=last_date)
+        if not mkt_ok:
+            is_alpha_leader = (today_val >= 30_000_000_000 and day_return >= 10.0 and high_close_ratio >= 0.70)
+            if not is_alpha_leader:
+                return None
+
+    # 4. Overbought parabolic exhaustion guard (disparity to 20MA <= 125%, relaxed to 138% for limit-up leaders)
     if len(df) >= 20:
         ma20 = float(df["Close"].rolling(20).mean().iloc[-1])
         disp = (close_p / ma20) * 100.0 if ma20 > 0 else 100.0
-        if disp > 125.0:
+        max_allowed_disp = 138.0 if (today_val >= 30_000_000_000 and day_return >= 12.0) else 125.0
+        if disp > max_allowed_disp:
             return None
+
+    is_limit_up = (day_return >= 28.5 or close_p >= prev_close * 1.295)
+    is_super_breakout = (day_return >= 18.0 or today_val >= 80_000_000_000)
+
+    score_val = 98.0 if is_limit_up else (97.0 if is_super_breakout else 96.0)
+    label_val = "초강세(상한가타겟)" if is_limit_up else ("초강세(주도타겟)" if is_super_breakout else "초강세(5%타겟)")
+    candle_desc = "초대형 거래대금 상한가 잔량 유지 마루보즈" if is_limit_up else "초대형 거래대금 돌파/상한가 마루보즈"
 
     tp_pct = 5.0
     sl_pct = 4.0
@@ -354,8 +376,8 @@ def evaluate_5pct_surge_candidate(
     return {
         "strategy": "SURGE_5PCT",
         "name_tag": "익일 5% 급등 타겟 (전일 매수 고확신)",
-        "score": 96.0,
-        "label": "초강세(5%타겟)",
+        "score": score_val,
+        "label": label_val,
         "tp_pct": tp_pct,
         "sl_pct": sl_pct,
         "entry_time": "전일 15:20 종가",
@@ -365,7 +387,7 @@ def evaluate_5pct_surge_candidate(
             "day_return": round(day_return, 2),
             "today_trading_val_억": round(today_val / 1e8, 1),
             "high_close_ratio": round(high_close_ratio * 100, 1),
-            "candle_type": "초대형 거래대금 돌파/상한가 마루보즈",
+            "candle_type": candle_desc,
         }
     }
 
@@ -453,13 +475,6 @@ def evaluate_intraday_daytrade_candidate(
     if df is None or len(df) < 1:
         return None
 
-    # Market regime check
-    if df_benchmark is not None:
-        last_date = df.index[-1].strftime("%Y-%m-%d") if hasattr(df.index[-1], "strftime") else str(df.index[-1])[:10]
-        mkt_ok, _, _ = evaluate_market_regime(df_benchmark, as_of_date=last_date)
-        if not mkt_ok:
-            return None
-
     today = df.iloc[-1]
     prev = df.iloc[-2] if len(df) >= 2 else today
 
@@ -479,25 +494,10 @@ def evaluate_intraday_daytrade_candidate(
     if today_val < min_today_val_krw:
         return None
 
-    # 2. Intraday gain from Open (시초가 대비 상승률)
-    gain_from_open = ((close_p - open_p) / open_p) * 100.0
-    if not (min_intraday_gain <= gain_from_open <= max_intraday_gain):
-        return None
-
-    # 3. Overall day return & remaining room to upper limit (+30%)
+    # Day return
     day_return = ((close_p - prev_close) / prev_close) * 100.0
     if day_return < 2.5:
         return None
-
-    # Cap target profit at KRX ceiling (+30%) if close is already high, but don't reject unless already locked at ceiling
-    limit_ceiling = prev_close * 1.295
-    if close_p >= limit_ceiling:
-        return None  # Rejects stocks already locked at upper limit (+30%)
-
-    target_tp_price = min(close_p * 1.05, limit_ceiling)
-    target_sl_price = close_p * 0.975
-
-    room_to_limit = max(0.0, ((prev_close * 1.30 - close_p) / close_p) * 100.0)
 
     # 4. Volume explosion ratio vs yesterday
     vol_ratio_vs_prev = (vol_p / prev_vol) if prev_vol > 0 else 1.0
@@ -510,34 +510,81 @@ def evaluate_intraday_daytrade_candidate(
     if support_ratio < 0.50:
         return None
 
+    # Market regime check with alpha leader exception for massive volume breakouts / limit-up stocks
+    if df_benchmark is not None:
+        last_date = df.index[-1].strftime("%Y-%m-%d") if hasattr(df.index[-1], "strftime") else str(df.index[-1])[:10]
+        mkt_ok, _, _ = evaluate_market_regime(df_benchmark, as_of_date=last_date)
+        if not mkt_ok:
+            is_alpha_leader = (today_val >= 25_000_000_000 and day_return >= 8.0 and support_ratio >= 0.50)
+            if not is_alpha_leader:
+                return None
+
+    # 2. Intraday gain from Open (시초가 대비 상승률)
+    gain_from_open = ((close_p - open_p) / open_p) * 100.0
+    limit_ceiling = prev_close * 1.295
+    is_at_limit = (close_p >= limit_ceiling or day_return >= 28.5)
+    is_super_surge = (gain_from_open > max_intraday_gain or day_return >= 15.0)
+
+    if not (min_intraday_gain <= gain_from_open <= max_intraday_gain):
+        # Allow upper-limit stocks and extreme momentum leaders to pass rather than being dropped
+        if not (is_super_surge and today_val >= min_today_val_krw and day_return >= 8.0):
+            return None
+
+    room_to_limit = max(0.0, ((prev_close * 1.30 - close_p) / close_p) * 100.0)
+
+    if is_at_limit:
+        target_tp_price = round(close_p * 1.05)
+        target_sl_price = round(close_p * 0.97)
+        score_val = 98.0
+        label_val = "초강세(상한가대장)"
+        tag_val = "실시간 상한가 대장주 (익일 갭 타겟)"
+        candle_type_desc = "상한가 잔량 유지 / 초대형 거래대금 주도 대장주"
+        rule_desc = f"현재가({close_p:,.0f}원) 상한가(+30%) 잔량 유지 확인 -> 익일 시초가 갭상승(+3%~+7%) 및 2차 슈팅 시 분할 익절 전략"
+    elif is_super_surge:
+        target_tp_price = round(min(close_p * 1.05, prev_close * 1.30))
+        target_sl_price = round(close_p * 0.965)
+        score_val = 97.0
+        label_val = "초강세(급등주도)"
+        tag_val = "실시간 초급등 돌파 주도주 (상한가 도전)"
+        candle_type_desc = "시초대비 폭발적 급등 / 상한가 도전 대장주"
+        rule_desc = f"현재가({close_p:,.0f}원) 거래대금 폭발 주도주 -> 상한가 안착 시 홀딩 후 익일 갭수익 청산, 밀릴 경우 분할 익절(+3%~+5%)"
+    else:
+        target_tp_price = round(min(close_p * 1.05, limit_ceiling))
+        target_sl_price = round(close_p * 0.975)
+        score_val = 95.0
+        label_val = "강세(당일단타)"
+        tag_val = "실시간 당일단타 (당일 +5% 돌파)"
+        candle_type_desc = "수급 폭발 장중 시초가 돌파봉"
+        rule_desc = f"현재가({close_p:,.0f}원) 즉시 매수 -> 당일 장중 목표가({target_tp_price:,.0f}원, +5%) 즉시 익절 / 손절선({target_sl_price:,.0f}원, -2.5%) / 15:15 종가 전량 청산 (No Overnight!)"
+
     tp_pct = 5.0
     sl_pct = 2.5
 
     return {
         "strategy": "DAY_TRADE_5PCT",
-        "name_tag": "실시간 당일단타 (당일 +5% 돌파)",
-        "score": 95.0,
-        "label": "강세(당일단타)",
+        "name_tag": tag_val,
+        "score": score_val,
+        "label": label_val,
         "tp_pct": tp_pct,
         "sl_pct": sl_pct,
         "entry_price": close_p,
-        "target_tp_price": round(target_tp_price),
-        "target_sl_price": round(target_sl_price),
+        "target_tp_price": target_tp_price,
+        "target_sl_price": target_sl_price,
         "entry_time": "장중 09:10~14:30 실시간 돌파 시 (현재 분석 시점)",
         "exit_time": "당일 장중 +5% 도달 시 즉시 익절 / 15:15 종가 전량 청산",
-        "rule_note": f"현재가({close_p:,.0f}원) 즉시 매수 -> 당일 장중 목표가({target_tp_price:,.0f}원, +5%) 즉시 익절 / 손절선({target_sl_price:,.0f}원, -2.5%) / 15:15 종가 전량 청산 (No Overnight!)",
+        "rule_note": rule_desc,
         "metrics": {
             "close": close_p,
             "open": open_p,
             "gain_from_open": round(gain_from_open, 2),
             "day_return": round(day_return, 2),
-            "target_tp_price": round(target_tp_price),
-            "target_sl_price": round(target_sl_price),
+            "target_tp_price": target_tp_price,
+            "target_sl_price": target_sl_price,
             "room_to_limit_pct": round(room_to_limit, 1),
             "today_trading_val_억": round(today_val / 1e8, 1),
             "vol_ratio_vs_prev": round(vol_ratio_vs_prev, 2),
             "support_ratio": round(support_ratio * 100, 1),
-            "candle_type": "수급 폭발 장중 시초가 돌파봉",
+            "candle_type": candle_type_desc,
         }
     }
 

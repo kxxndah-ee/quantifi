@@ -410,18 +410,34 @@ def _evaluate_single_stock(
             vol_ratio_prev_val = m_dt.get('vol_ratio_vs_prev', 1.0)
             room_limit_val = m_dt.get('room_to_limit_pct', 0)
 
-            reason_summary = f"대금 {today_val_b_val:,.0f}억 유입 | 시초대비 {gain_from_open_val:+.1f}% 돌파 | 양봉지지 {supp_ratio_val:.0f}%"
-            reason_core = "장중 대규모 수급(거래대금)이 유입되며 시초가를 강력하게 상향 돌파하였고, 윗꼬리가 짧은 견고한 양봉 지지력을 유지하여 당일 장중 +5% 추가 슈팅 확률이 매우 높은 당일단타 주도주입니다."
+            is_limit_leader = ("상한가" in dtrade.get("label", "") or chg_pct >= 28.5)
+            is_surge_leader = ("급등주도" in dtrade.get("label", "") or chg_pct >= 15.0)
+
+            if is_limit_leader:
+                reason_summary = f"[상한가 대장주] 대금 {today_val_b_val:,.0f}억 폭발 | 상한가 안착 (+{chg_pct:.1f}%) | 익일 갭수익 공략"
+                reason_core = "장중 대규모 수급과 함께 상한가(+30%)에 안착한 시장 1등 대장주입니다. 상한가 매수 잔량 지지력을 바탕으로 익일 장초반 강력한 갭상승 및 추가 슈팅 시 분할 익절을 목표로 합니다."
+                limit_criterion = "상한가(+30%) 안착 및 매수 잔량 유지 (익일 시초가 +3%~+7% 갭상승 타겟)"
+            elif is_surge_leader:
+                reason_summary = f"[초급등 주도주] 대금 {today_val_b_val:,.0f}억 폭발 | 시초대비 {gain_from_open_val:+.1f}% 급등 | 상한가 도전"
+                reason_core = "장중 대규모 주도 수급이 집중되며 시초가를 폭발적으로 상향 돌파한 시장 주도 대장주입니다. 상한가 안착 시 홀딩, 장중 슈팅 시 분할 익절을 타겟합니다."
+                limit_criterion = f"상한가(+30%)까지 잔여 상승폭 +{room_limit_val:.1f}% 확보 (추가 상한가 터치 타겟)"
+            else:
+                reason_summary = f"대금 {today_val_b_val:,.0f}억 유입 | 시초대비 {gain_from_open_val:+.1f}% 돌파 | 양봉지지 {supp_ratio_val:.0f}%"
+                reason_core = "장중 대규모 수급(거래대금)이 유입되며 시초가를 강력하게 상향 돌파하였고, 윗꼬리가 짧은 견고한 양봉 지지력을 유지하여 당일 장중 +5% 추가 슈팅 확률이 매우 높은 당일단타 주도주입니다."
+                limit_criterion = f"상한가(+30%)까지 잔여 상승폭 +{room_limit_val:.1f}% 확보 (목표 +5% 익절 공간 여유)"
+
             pm_ctx = params.get("premarket_ctx") or {}
             pm_regime = pm_ctx.get("regime", "중립")
             reason_criteria = [
                 f"당일 거래대금 {today_val_b_val:,.0f}억 원 유입 (최소 기준 {min_daytrade_val_b}억 원 충족)",
-                f"시초가 대비 {gain_from_open_val:+.1f}% 돌파 (유효 돌파 구간 +{intraday_gain_range[0]}% ~ +{intraday_gain_range[1]}% 충족)",
+                f"시초가 대비 {gain_from_open_val:+.1f}% 돌파 (유효 돌파 구간 +{intraday_gain_range[0]}% ~ +{intraday_gain_range[1]}% 충족)" if not is_surge_leader else f"시초가 대비 {gain_from_open_val:+.1f}% 강력 폭발 (초급등 대장주)",
                 f"장중 전일 거래량 대비 {vol_ratio_prev_val*100:.0f}% 돌파 (수급 집중 기준 {min_daytrade_vol_ratio*100:.0f}% 충족)",
                 f"당일 진폭 중 고점 지지율 {supp_ratio_val:.1f}% (윗꼬리 짧은 탄탄한 양봉 지지, 65% 이상 충족)",
-                f"프리마켓 매크로 점검: 글로벌 체제 [{pm_regime}] 상태 연동 (목표 익절 +5.0% / 손절 -2.5% 당일 청산 준수)",
-                f"상한가(+30%)까지 잔여 상승폭 +{room_limit_val:.1f}% 확보 (목표 +5% 익절 공간 여유)"
+                f"프리마켓 매크로 점검: 글로벌 체제 [{pm_regime}] 상태 연동",
+                limit_criterion
             ]
+
+            rule_note_str = dtrade.get("rule_note") if (is_limit_leader or is_surge_leader) else f"1단계: 09:00 시초가 갭하락(-0.8% 이하) 시 진입 취소 | 2단계: 현재가({close_p:,.0f}원) 진입 후 +2.0%~+2.5% 도달 시 50% 분할익절 및 본전스탑 상향 | 3단계: 최종목표(+5.0%) / 손절선({round(close_p*0.975):,.0f}원, -2.5%) / 15:15 종가 전량 청산"
 
             return {
                 "code": code,
@@ -437,11 +453,11 @@ def _evaluate_single_stock(
                 "high": high_p,
                 "low": low_p,
                 "volume": vol_p,
-                "timing_label": "장중 실시간 (09:10~14:30)",
+                "timing_label": "장중 실시간 (상한가 대장)" if is_limit_leader else ("장중 실시간 (초급등 주도)" if is_surge_leader else "장중 실시간 (09:10~14:30)"),
                 "strategy_mode": "DAY_TRADE_5PCT",
-                "strategy_tag": "당일단타 (당일 +5%)",
+                "strategy_tag": "당일단타 (상한가 대장)" if is_limit_leader else ("당일단타 (초급등 주도)" if is_surge_leader else "당일단타 (당일 +5%)"),
                 "premarket_regime": pm_regime,
-                "premarket_gap_guide": "장중 09:10~14:30 실시간 수급 폭발 및 시초가 돌파 확인 후 진입",
+                "premarket_gap_guide": "장중 상한가 잔량 지지력 확인 후 익일 갭수익 공략" if is_limit_leader else "장중 09:10~14:30 실시간 수급 폭발 및 시초가 돌파 확인 후 진입",
                 "premarket_risk": pm_ctx.get("gap_risk", "보통 (중립)"),
                 "score": dtrade["score"],
                 "label": dtrade["label"],
@@ -449,8 +465,8 @@ def _evaluate_single_stock(
                 "sl_pct": dtrade["sl_pct"],
                 "vol_ratio": vol_ratio_prev_val,
                 "rsi": 65.0,
-                "ma_status": "장중 수급폭발 돌파",
-                "rule_note": f"1단계: 09:00 시초가 갭하락(-0.8% 이하) 시 진입 취소 | 2단계: 현재가({close_p:,.0f}원) 진입 후 +2.0%~+2.5% 도달 시 50% 분할익절 및 본전스탑 상향 | 3단계: 최종목표(+5.0%) / 손절선({round(close_p*0.975):,.0f}원, -2.5%) / 15:15 종가 전량 청산",
+                "ma_status": "상한가 잔량 유지 대장주" if is_limit_leader else "장중 수급폭발 돌파",
+                "rule_note": rule_note_str,
                 "reason_summary": reason_summary,
                 "reason_core": reason_core,
                 "reason_criteria": reason_criteria,
